@@ -1,0 +1,1715 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Magpie</title>
+<!-- Tab icon. Josh, 2026-09-22: "it kind of gets lost in all my other tabs
+     because I can't recognize it." The old one drew the bird in a 44x32 box,
+     so at 16px it was a thin smudge with big empty margins. This one fills a
+     square tile with a dark background, so it holds its shape next to Google's
+     favicons in a crowded strip. -->
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%2311151d'/><path d='M20.5 15.5 C24 17 27.5 19.5 30 22.5 L27.5 25.5 C24.5 22 21.5 19.5 18.5 18.5 Z' fill='%235b7fa3'/><path d='M4 15.5 C4 8.5 9.5 4.5 15.5 5.2 C21.5 5.9 25 10.5 24.5 16 C24 21.5 19.5 25 14 24.7 C8.5 24.4 4 21 4 15.5 Z' fill='%23f2f0eb'/><path d='M15.5 6.6 C21 7.6 24.3 11.4 24.1 16.2 C23.9 20 21.5 22.8 18.2 24.1 C20 18.8 19 12 15.5 6.6 Z' fill='%2311151d'/><circle cx='9' cy='12' r='5.6' fill='%2311151d'/><circle cx='7.6' cy='10.6' r='1.9' fill='%23fff'/><circle cx='7.2' cy='10.6' r='.95' fill='%2311141a'/><path d='M4.2 12.8 L-0.8 14.4 L4.2 16 Z' fill='%23e8a93f'/></svg>">
+<style>
+  :root{
+    --bg:#15171c; --panel:#1c1f26; --panel-2:#232730; --line:#2f333d;
+    --ink:#e9e7e2; --dim:#8d8880; --hot:#e2705a; --good:#7fae8c; --warn:#d3a25c;
+    --mono:ui-monospace,"JetBrains Mono",Menlo,monospace;
+    /* the bird */
+    --pie-dark:#1f2430; --pie-dark2:#11151d; --pie-light:#e9e7e2; --pie-sheen:#5b7fa3;
+    --pie-beak:#d3a25c; --pie-shiny:#7fae8c;
+  }
+  *{box-sizing:border-box}
+  [hidden]{display:none!important}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:15px/1.5 -apple-system,BlinkMacSystemFont,sans-serif;overflow:hidden}
+  /* header, CHAPTER STRIP, then the work area */
+  .app{display:grid;grid-template-rows:auto auto 1fr;height:100vh}
+
+  /* ---------- chapter strip ----------
+     Josh, 2026-09-15: "I can only have one active chapter at a time ... that chapter has
+     its own movie assets, its own audio ... but all this stuff is out of the way. That way
+     I can dedicate basically that full UI to just one chapter at a time."
+     So the strip is deliberately THIN and sits above everything: it says which chapter he
+     is in and gets out of the way. The active tab is the only one lit. */
+  .chapbar{display:flex;align-items:center;gap:6px;padding:5px 16px;background:#141821;
+    border-bottom:1px solid var(--line);overflow-x:auto;scrollbar-width:none}
+  .chapbar::-webkit-scrollbar{display:none}
+  .chaplabel{font:600 9px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;
+    color:var(--dim);flex:0 0 auto;margin-right:2px}
+  .chap{display:flex;align-items:center;gap:7px;flex:0 0 auto;cursor:pointer;
+    background:var(--panel-2);border:1px solid var(--line);border-radius:7px;
+    padding:5px 11px;color:var(--dim);font:600 12px/1 -apple-system,sans-serif;
+    white-space:nowrap}
+  .chap:hover{border-color:var(--dim);color:var(--ink)}
+  .chap .cnt{font:600 9px/1 var(--mono);opacity:.7;letter-spacing:.04em}
+  .chap.on{background:var(--panel);border-color:var(--pie-shiny);color:var(--ink);
+    box-shadow:inset 0 0 0 1px var(--pie-shiny)}
+  .chap.on .cnt{color:var(--pie-shiny);opacity:1}
+  .chapadd{flex:0 0 auto;font:600 11px/1 var(--mono);letter-spacing:.06em;
+    background:transparent;border:1px dashed var(--line);color:var(--dim);
+    border-radius:7px;padding:6px 11px;cursor:pointer}
+  .chapadd:hover{border-color:var(--pie-shiny);color:var(--pie-shiny)}
+
+  /* ---------- header ---------- */
+  header{display:flex;align-items:center;gap:12px;padding:9px 16px;
+    border-bottom:1px solid var(--line);background:var(--panel)}
+  .brand{display:flex;align-items:center;gap:9px;text-decoration:none}
+  .mark{width:38px;height:28px;flex:0 0 auto}
+  .word{font:600 17px/1 "Iowan Old Style",Georgia,serif;letter-spacing:.005em;
+    color:var(--ink)}
+  .brand:hover .word{color:var(--pie-shiny)}
+  header .sp{flex:1}
+  .btn{font:600 12px/1 var(--mono);letter-spacing:.06em;text-transform:uppercase;
+    background:var(--panel-2);border:1px solid var(--line);color:var(--ink);
+    padding:9px 14px;border-radius:6px;cursor:pointer}
+  .btn:hover{border-color:var(--dim)}
+  .btn.pri{background:var(--hot);border-color:var(--hot);color:#fff}
+  .btn.ok{background:var(--good);border-color:var(--good);color:#10221a}
+  .btn.sm{padding:6px 10px;font-size:10px}
+  .btn:disabled{opacity:.4;cursor:not-allowed}
+  .projbox{display:flex;align-items:center;gap:5px;padding:4px 6px;
+    border:1px solid var(--line);border-radius:8px;background:#191c22}
+  .projname{font:600 12px var(--mono);color:var(--warn);border:1px solid var(--line);
+    border-radius:5px;padding:5px 9px;cursor:pointer;background:var(--panel-2)}
+  .projname:hover{border-color:var(--warn)}
+  .kk{font-size:9px;opacity:.55;margin-left:5px;border:1px solid currentColor;
+    border-radius:3px;padding:1px 4px}
+  /* a drawer for the things that used to clutter the sidebar */
+  .drawer{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:40;
+    display:flex;align-items:flex-start;justify-content:center;padding-top:70px}
+  .drawer .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;
+    width:min(560px,92vw);max-height:76vh;overflow-y:auto;padding:16px}
+  .drawer h4{margin:0 0 12px;font:600 12px var(--mono);letter-spacing:.1em;
+    text-transform:uppercase;color:var(--dim)}
+
+  /* ---------- export screen ---------- */
+  .exwhat{background:#171b23;border:1px solid var(--line);border-radius:8px;
+    padding:12px 14px;margin-bottom:16px}
+  .exwhat .exttl{font:600 15px/1.3 -apple-system,sans-serif;color:var(--ink);
+    margin-bottom:5px}
+  .exwhat .exmeta{font:12px/1.6 var(--mono);color:var(--dim)}
+  .exwhat .exwarn{color:var(--warn)}
+  .exlab{display:block;font:600 10px var(--mono);letter-spacing:.1em;
+    text-transform:uppercase;color:var(--dim);margin-bottom:6px}
+  .exrow{display:flex;align-items:center;gap:8px}
+  .exinput{flex:1;background:var(--panel-2);border:1px solid var(--line);
+    border-radius:6px;color:var(--ink);padding:10px 12px;
+    font:14px -apple-system,sans-serif;min-width:0}
+  .exinput:focus{outline:none;border-color:var(--pie-shiny)}
+  .exext{font:600 13px var(--mono);color:var(--dim);flex:0 0 auto}
+  .exhint{font:11px/1.5 var(--mono);color:var(--dim);margin-top:8px}
+  .exbtns{display:flex;gap:8px;align-items:center;margin-top:18px}
+  /* which chapters go in the film */
+  .expick{display:flex;flex-direction:column;gap:2px;margin-bottom:14px}
+  .exrowc{display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:7px;
+    cursor:pointer;border:1px solid transparent}
+  .exrowc:hover{background:#171b23;border-color:var(--line)}
+  .exrowc input{width:16px;height:16px;accent-color:var(--good);cursor:pointer;flex:0 0 auto}
+  .exrowc .cn{font:600 13px -apple-system,sans-serif;color:var(--ink)}
+  .exrowc .cd{font:11px var(--mono);color:var(--dim);margin-left:auto}
+  .exsum{font:12px/1.5 var(--mono);color:var(--dim);border-top:1px solid var(--line);
+    padding-top:10px;margin-bottom:14px}
+  .exsum b{color:var(--pie-shiny);font-weight:600}
+  .btn.danger:hover{border-color:var(--hot);color:var(--hot)}
+  .projlabel{font:600 9px var(--mono);letter-spacing:.14em;text-transform:uppercase;
+    color:var(--dim);padding-left:3px}
+  /* "let's force that I name the project" — an inline nudge, never a modal that blocks
+     the app (a prompt() here froze the whole page once). */
+  .projname.needsname{color:var(--hot);border-color:var(--hot);animation:nameNag 2s ease-in-out infinite}
+  @keyframes nameNag{0%,100%{opacity:1}50%{opacity:.55}}
+
+  /* screen switch — INPUT is where you work, OUTPUT is its own place */
+  .screens{display:flex;gap:0;border:1px solid var(--line);border-radius:7px;overflow:hidden;flex-shrink:0}
+  .screens button{white-space:nowrap;font:600 11px var(--mono);letter-spacing:.08em;background:none;
+    border:0;color:var(--dim);padding:8px 16px;cursor:pointer}
+  .screens button.on{background:var(--hot);color:#fff}
+  .screens button.on.out{background:var(--good);color:#10221a}
+
+  /* ---------- INPUT screen ---------- */
+  /* the side tray is gone — the grabber gets the whole width (2026-09-11) */
+  .work{display:grid;grid-template-columns:1fr;min-height:0;height:100%}
+  .left{display:flex;flex-direction:column;min-width:0;min-height:0;padding:10px 12px;gap:6px}
+  /* the chunk owns this whole column now (2026-09-11) — the file lists moved to ASSETS */
+  .right{border-left:1px solid var(--line);background:var(--panel);
+    display:flex;flex-direction:column;min-height:0;overflow:hidden}
+
+  .vidwrap{position:relative;background:#000;border:1px solid var(--line);border-radius:8px;
+    flex:1;min-height:0;display:flex;align-items:center;justify-content:center;overflow:hidden}
+  video{max-width:100%;max-height:100%;display:block}
+  /* THE STAGE (2026-09-22): the video takes every pixel the controls don't need, and the
+     transport sits beside it instead of in a row below it. */
+  .stage{display:flex;gap:10px;flex:1;min-height:0}
+  .stage .vidwrap{flex:1}
+  .transport{width:156px;flex:none;display:flex;flex-direction:column;gap:7px;padding:10px;
+    background:var(--panel);border:1px solid var(--line);border-radius:8px;font:11px var(--mono)}
+  .transport kbd{font:600 10px var(--mono);background:#12141a;border:1px solid var(--line);
+    border-radius:3px;padding:0 4px;color:var(--dim)}
+  .tpbig{font:700 17px var(--mono);padding:16px 0;border-radius:8px;border:0;cursor:pointer;
+    background:var(--good);color:#0f1510}
+  .tpbig.playing{background:var(--warn);color:#1a1408}
+  .tpkey{text-align:center;color:var(--dim);font-size:10px;margin-top:-3px}
+  .tptog{display:flex;align-items:center;gap:7px;padding:8px;border:1px solid var(--line);
+    border-radius:6px;cursor:pointer;color:var(--dim)}
+  .tptog input{margin:0}
+  .tptog kbd{margin-left:auto}
+  .tptog:has(input:checked){border-color:var(--good);background:#1b2620;color:var(--ink)}
+  .tpmark{padding:9px 0;border-radius:6px;border:1px solid var(--warn);background:#2a2119;
+    color:var(--ink);font:600 12px var(--mono);cursor:pointer}
+  .tpmark:hover{background:#3a2d1f}
+  .tpremove{padding:8px 0;border-radius:6px;border:1px solid #5c2f2f;background:#2a1a1a;
+    color:#e59d9d;font:600 11px var(--mono);cursor:pointer}
+  .tpstate{color:var(--dim);font-size:10.5px;line-height:1.4}
+  .tpsp{flex:1}
+  .tpkeys{color:var(--dim);font-size:10px;line-height:1.7}
+  /* the moment map's two tracks were a second copy of what the tracks above already show
+     and click; only its problem line + fix buttons stay, and only when something's wrong */
+  .mmap .mmaprow, .mmap .mmaplinks{display:none}
+  .empty{color:var(--dim);font-size:14px;text-align:center;padding:30px}
+
+  /* the one input bar, with the chunk drawn on it */
+  .barwrap{display:flex;align-items:center;gap:11px}
+  .barlabel{font:600 10px var(--mono);letter-spacing:.1em;color:var(--hot);min-width:44px}
+  .scrub{position:relative;height:42px;background:var(--panel-2);
+    border:1px solid var(--line);border-radius:6px;cursor:crosshair;overflow:hidden;flex:1}
+  .scrub .played{position:absolute;top:0;bottom:0;left:0;background:#2b303a}
+  .scrub .chunkmark{position:absolute;top:0;bottom:0;background:rgba(211,162,92,.34);
+    border-left:2px solid var(--warn);border-right:2px solid var(--warn);pointer-events:none}
+  .scrub .head{position:absolute;top:0;bottom:0;width:2px;background:var(--ink);pointer-events:none}
+  .clock{font:11px var(--mono);color:var(--dim);font-variant-numeric:tabular-nums;
+    min-width:118px;text-align:right}
+
+  /* hints sit NEXT TO what they control */
+  .hintrow{display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+    font:11px var(--mono);color:var(--dim)}
+  .hintrow kbd{font:600 10px var(--mono);background:#12141a;border:1px solid var(--line);
+    border-radius:4px;padding:3px 7px;color:var(--ink);margin-right:5px}
+  .hintrow em{font-style:normal;color:var(--dim)}
+  .hgroup{display:flex;align-items:center;gap:5px}
+
+  /* ---------- the chunk: its own player, lower right ---------- */
+  .chunkpanel{padding:13px;background:var(--panel-2);
+    display:flex;flex-direction:column;gap:8px;flex:1;min-height:0;overflow-y:auto}
+  /* one track per thing he sets — bar on top, its OWN nudge row under it (the phone's
+     layout, mirrored on the desktop at his request 2026-09-11) */
+  /* ===== THE GRABBER — the chunk owns the INPUT screen (2026-09-11) ===== */
+  .stagetag{position:absolute;top:9px;left:11px;font:700 10px var(--mono);
+    letter-spacing:.12em;color:var(--warn);background:rgba(0,0,0,.55);
+    padding:3px 8px;border-radius:5px;pointer-events:none}
+  .gtrack{display:flex;flex-direction:column;gap:3px;flex:none}
+  .gtwrap{display:grid;grid-template-columns:250px minmax(0,1fr);gap:12px;flex:none;align-items:stretch}
+  .gtcol{display:flex;flex-direction:column;gap:6px;min-width:0}
+  .gtsum{display:flex;flex-direction:column;gap:5px;justify-content:center;padding:6px 8px;
+    border-radius:8px;background:var(--panel-2);border:1px solid var(--line)}
+  /* DENSE (Josh, 2026-09-26: "the one with all the stats on the left... it's too tall") —
+     each row is ONE line: symbol+label | value; the note is a single quiet line under it. */
+  .gsrow{display:grid;grid-template-columns:92px minmax(0,1fr);column-gap:6px;row-gap:1px;align-items:center}
+  .gsrow > label{grid-column:1;white-space:nowrap}
+  .gsrow > .gsin,.gsrow > .gsratebar{grid-column:2}
+  .gsrow > .gsnote{grid-column:1/-1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .sym{font-style:normal;margin-right:4px;font-size:1.05em;letter-spacing:0}
+  .gsrow label{font:700 9.5px var(--mono);letter-spacing:.07em}
+  .gsrow.vid label{color:var(--warn)} .gsrow.aud label{color:var(--good)} .gsrow.glen label{color:#6bb6ff}
+  .gsin{width:100%;min-width:0;padding:3px 7px;border-radius:6px;border:1px solid var(--line);
+    background:#12141a;color:var(--ink);font:700 13px var(--mono);font-variant-numeric:tabular-nums}
+  .gsin:focus{outline:none;border-color:var(--ink)}
+  .gsrow.vid .gsin{border-left:3px solid var(--warn)} .gsrow.aud .gsin{border-left:3px solid var(--good)}
+  .gsrow.glen .gsin{border-left:3px solid #6bb6ff}
+  .gsrow.grate label{color:#e59dd6} .gsrow.grate .gsin{border-left:3px solid #e59dd6}
+  .gsratebar{display:flex;gap:4px;align-items:stretch}
+  .gsratebar .gsin{flex:1}
+  .gsratebar button{padding:0 7px;border-radius:6px;border:1px solid var(--line);background:var(--panel);
+    color:var(--dim);font:700 11px var(--mono);cursor:pointer}
+  .gsratebar button:hover{color:var(--ink);border-color:#e59dd6}
+  .gsin::-webkit-outer-spin-button,.gsin::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+  .gsnote{font:10px var(--mono);color:var(--dim);line-height:1.35;overflow-wrap:anywhere}
+  .gtlab{display:flex;align-items:baseline;gap:9px;font:10px var(--mono);
+    letter-spacing:.09em;color:var(--dim)}
+  .gtlab b{color:var(--ink);font-size:11px}
+  #gt-video .gtlab b{color:var(--warn)}      /* gold — the chunk */
+  #gt-audio .gtlab b{color:var(--good)}      /* green — the audio */
+  .gtsub{color:var(--warn);font-variant-numeric:tabular-nums}
+  #gt-audio .gtsub{color:var(--good)}
+  .gtskip.len .gtlenlab b{color:#6bb6ff}     /* blue — length */
+  .gtskip.pos .gtlenlab b{color:var(--warn)}
+  .gthint{font:10px var(--mono);color:var(--dim);opacity:.75}
+  .gtbar{position:relative;height:26px;border-radius:6px;background:#12151b;
+    border:1px solid var(--line);cursor:pointer;overflow:hidden}
+  .gtbar.audio{background:#131a17;border-color:#2b3a33;touch-action:none;cursor:ew-resize}
+  .gtseams{position:absolute;inset:0;pointer-events:none}
+  .gtseams u{position:absolute;top:0;bottom:0;width:1px;background:var(--dim);opacity:.5}
+  .gtmarks{position:absolute;inset:0;pointer-events:none}
+  /* silences in the bed: hatched, so a gap you put there reads as deliberate */
+  .gtsil{position:absolute;inset:0;pointer-events:none}
+  .gtsil i{pointer-events:auto;cursor:grab;z-index:6;touch-action:none}   /* above moments: a moment over a silence would swallow its click */
+  .gtsil i:hover,.gtsil i.sel{background-color:rgba(255,255,255,.18);box-shadow:0 0 0 1px var(--ink) inset}
+  .gtsil i{position:absolute;top:0;bottom:0;min-width:2px;
+    background:repeating-linear-gradient(135deg,rgba(255,255,255,.28) 0 3px,transparent 3px 7px);
+    border-left:1px solid rgba(255,255,255,.5);border-right:1px solid rgba(255,255,255,.5)}
+  .chmenu{position:fixed;z-index:80;min-width:220px;display:flex;flex-direction:column;gap:3px;padding:6px;
+    background:var(--panel);border:1px solid var(--line);border-radius:9px;box-shadow:0 12px 40px rgba(0,0,0,.55)}
+  .chmenu .chmhead{font:10px var(--mono);letter-spacing:.08em;color:var(--dim);padding:4px 6px}
+  .chmenu button{text-align:left;padding:8px 10px;border-radius:6px;border:1px solid transparent;
+    background:transparent;color:var(--ink);font:600 12px var(--mono);cursor:pointer}
+  .chmenu button:hover{background:var(--panel-2);border-color:var(--line)}
+  .silctl{display:inline-flex;align-items:center;gap:4px;margin-right:6px}
+  .silctl input{width:52px;padding:3px 6px;border-radius:5px;border:1px solid var(--line);
+    background:#12141a;color:var(--ink);font:600 11px var(--mono)}
+  .silunit{font:10px var(--mono);color:var(--dim)}
+  .asssil{display:flex;flex-direction:column;gap:4px;margin-top:6px}
+  .asssil .silrow{display:flex;align-items:center;gap:6px;font:11px var(--mono);color:var(--dim)}
+  .asssil .silrow b{color:var(--ink);min-width:44px;text-align:center}
+  .asssil button{padding:2px 8px;border-radius:5px;border:1px solid var(--line);background:var(--panel);
+    color:var(--ink);font:600 11px var(--mono);cursor:pointer}
+  .asssil button.del:hover{background:#2a1a1a;border-color:#5c2f2f;color:#e59d9d}
+  /* the marks THEMSELVES take clicks (the container doesn't) — click one to edit it */
+  /* above the drag block, or a moment underneath it could never be clicked */
+  .gtmarks i{position:absolute;top:0;bottom:0;background:var(--pie-sheen);opacity:.45;
+    pointer-events:auto;cursor:pointer;border-radius:2px;z-index:4}
+  .gtmarks i:hover{opacity:.8;box-shadow:0 0 0 1px var(--ink) inset}
+  .gtmarks i.sel{opacity:1;background:var(--warn);box-shadow:0 0 0 1px #fff inset}   /* the chunk being edited */
+  /* a moment that is ALREADY broken, and the one a new mark would land on */
+  .gtmarks i.broken{background:#c2544f;opacity:.85;box-shadow:0 0 0 1px #ff9d97 inset}
+  .gtmarks i.clash{background:#ff6b63;opacity:1;box-shadow:0 0 0 2px #fff inset;z-index:5}
+  /* a moment whose clip is set aside — kept, but not in the video */
+  .gtmarks i.shelved{background:transparent;opacity:.5;
+    border:1px dashed var(--dim);box-shadow:none}
+  /* the same "kept but not in the video" look on the audio-placement track, so the
+     space a shelved moment used to claim reads as OPEN rather than occupied */
+  .damarks i.shelved{background:transparent;opacity:.5;
+    border:1px dashed var(--dim);box-shadow:none}
+  .gtblock.clash{border-color:#ff6b63;background:rgba(255,107,99,.25)}
+  .btn.pri.blocked{background:#3a2626;border-color:#5c2f2f;color:#e59d9d;cursor:not-allowed}
+  /* the SAME block on both tracks — what you grab, and where it lands */
+  /* ⏱ THE EDGES ARE LITERAL. Josh, 2026-09-12: "the actual left edge needs to represent
+     the exact start and the actual right edge needs to represent the [exact end], not
+     like a padded version of it." Measured before the fix: a 5s chunk drew 8px wide
+     where the truth was 4px, so the right edge lied by 5.5 SECONDS and the grab handles
+     overhung by up to 11.8s.
+     Rules that keep it honest: NO min-width (it inflates a short chunk), borders INSIDE
+     via box-sizing, and the handles sit INSIDE the block — never poking past an edge. */
+  .gtblock{position:absolute;top:3px;bottom:3px;box-sizing:border-box;
+    background:rgba(255,196,107,.28);border-left:2px solid var(--warn);
+    border-right:2px solid var(--warn);cursor:grab;
+    touch-action:none;z-index:2;outline:1px solid rgba(0,0,0,.45);outline-offset:0}
+  .gtblock:active{cursor:grabbing}
+  /* too narrow to draw 2px edges without lying about the span */
+  .gtblock.thin{border-left-width:1px;border-right-width:0;background:var(--warn)}
+  .gtblock.thin.audio{background:var(--good)}
+  .gtblock.thin .gh::after{display:none}
+  .gtblock.audio{background:rgba(127,224,171,.14);
+    border-left-color:var(--good);border-right-color:var(--good);cursor:grab;z-index:7}
+  /* the grab target is WIDER than the visible edge but grows INWARD, so the drawn
+     boundary stays exactly on the real time while staying easy to grab */
+  /* the block itself is a READOUT — it must never swallow a drag */
+  .gtblock{pointer-events:none}
+  /* EDGE GRIPS: centred ON the true edge, so the visible line stays exact while the
+     grab target extends both ways. Tall handle bars make them obviously draggable. */
+  /* Edges own the TOP band, move owns the BOTTOM band — separated on the Y axis so they
+     can never contest the same pixel regardless of how short the chunk is. */
+  .gedge{position:absolute;top:0;bottom:12px;width:16px;margin-left:-8px;z-index:6;
+    cursor:ew-resize;touch-action:none;display:flex;align-items:center;
+    justify-content:center}
+  .gedge::after{content:'';width:4px;height:60%;border-radius:2px;
+    background:var(--warn);box-shadow:0 0 0 1px rgba(0,0,0,.5)}
+  .gedge:hover::after{height:86%;width:5px;background:#ffd9a0}
+  .gedge:active::after{background:#fff}
+  /* MOVE GRIP: its own bar UNDER the block, so moving and resizing are never the same
+     pixel. Spans the chunk, with a minimum so a thin chunk is still draggable. */
+  .gmove{position:absolute;bottom:0;height:11px;z-index:5;cursor:grab;
+    touch-action:none;background:var(--warn);border-radius:3px;
+    box-shadow:0 0 0 1px rgba(0,0,0,.45);min-width:26px}
+  .gmove:hover{background:#ffd9a0}
+  .gmove:active{cursor:grabbing;background:#fff}
+  /* a chunk too narrow for three targets: move gets a fixed centred bar, the edge grips
+     step OUTWARD so nothing stacks. The drawn block never moves — only the grips do. */
+  .gmove.tight{width:30px!important;margin-left:-15px;min-width:0}
+  .gedge.tight.l{margin-left:-24px} .gedge.tight.r{margin-left:8px}
+  .gedge.tight::after{height:100%}
+  .gtbar.audio .gedge::after,.gtbar.audio .gmove{background:var(--good)}
+  /* keeps a sub-pixel chunk FINDABLE without widening it: a caret under the block's
+     centre, not part of the block's span */
+  .gtblock::before{content:'';position:absolute;left:50%;bottom:-7px;width:0;height:0;
+    margin-left:-5px;border-left:5px solid transparent;border-right:5px solid transparent;
+    border-bottom:6px solid var(--warn);pointer-events:none}
+  .gtblock.audio::before{border-bottom-color:var(--good)}
+  .gthead{position:absolute;top:0;bottom:0;width:2px;background:var(--ink);
+    pointer-events:none;opacity:.8}
+  .gtskip{display:flex;gap:4px}
+  .gtskip.len{align-items:center}
+  .gtlenlab{font:10px var(--mono);letter-spacing:.08em;color:var(--dim);
+    white-space:nowrap;padding-right:4px}
+  .gtlenlab b{color:var(--warn);font-size:11px}
+  .gtskip .clenfield{flex:1.2;min-width:60px;padding:6px 8px;border-radius:5px;
+    border:1px solid var(--line);background:var(--panel);color:var(--ink);
+    font:600 11px var(--mono);text-align:center}
+  .gtfoot{display:flex;align-items:center;gap:12px;padding-top:2px}
+  /* 🎨 COLOR CODING (Josh, 2026-09-12: "there's no color coding... nothing to make it
+     obvious as to what's happening... even each button could have some sort of styling
+     that makes it obvious like oh I'm changing the length or I'm changing the starting
+     point"). ONE colour per idea, used on the track, its buttons and the legend:
+        GOLD  = the chunk / where it starts      BLUE = how long it is
+        GREEN = the audio / where it lands       RED  = a problem */
+  .gtskip.pos button{border-bottom:2px solid var(--warn)}
+  .gtskip.pos button:hover{background:#2c2519;border-color:var(--warn)}
+  .gtskip.len button{border-bottom:2px solid #6bb6ff}
+  .gtskip.len button:hover{background:#1b2530;border-color:#6bb6ff}
+  .gtskip.aud button{border-bottom:2px solid var(--good)}
+  .gtskip.aud button:hover{background:#1b2620;border-color:var(--good)}
+  .gtskip.aud .gtlenlab b{color:var(--good)}   /* green — where it lands */
+  /* the edit screen wears the SAME three colours as the main page, in the same order */
+  .dfield.vid label{color:var(--warn)}  .dfield.vid button{border-bottom:2px solid var(--warn)}
+  .dfield.aud label{color:var(--good)}  .dfield.aud button{border-bottom:2px solid var(--good)}
+  .dfield.len label{color:#6bb6ff}      .dfield.len button{border-bottom:2px solid #6bb6ff}
+  .dfield.rate label{color:#e59dd6}     .dfield.rate button{border-bottom:2px solid #e59dd6}
+  .dfield .dhint{font-weight:400;color:var(--dim);letter-spacing:0;margin-left:6px}
+  .gtlegend{display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+    font:10px var(--mono);color:var(--dim);padding:2px 0 0}
+  .gtlegend i{display:inline-block;width:10px;height:10px;border-radius:2px;
+    margin-right:5px;vertical-align:-1px}
+  .gtlegend span{white-space:nowrap}
+  .gtskip button{flex:1;padding:3px 0;border-radius:5px;border:1px solid var(--line);
+    background:var(--panel);color:var(--ink);font:600 10.5px var(--mono);cursor:pointer}
+  .gtskip button:hover{background:#2c313c;border-color:var(--warn)}
+
+  .dtrack{display:flex;flex-direction:column;gap:4px}
+  .dtlab{display:flex;justify-content:space-between;align-items:baseline;
+    font:10px var(--mono);letter-spacing:.08em;color:var(--dim)}
+  .dtlab b{color:var(--ink)}
+  .dtlab span{color:var(--warn);font-variant-numeric:tabular-nums}
+  .dtbar{position:relative;height:26px;border-radius:5px;background:#12151b;
+    border:1px solid var(--line);cursor:pointer;overflow:hidden}
+  .dtmarks{position:absolute;inset:0}
+  .dtmarks i{position:absolute;top:0;bottom:0;background:var(--pie-sheen);opacity:.55}
+  /* the chunk can be a couple of seconds inside a 27-minute input, so give the window
+     a visible minimum and a bright edge — otherwise it vanishes at that scale */
+  .dtwin{position:absolute;top:-1px;bottom:-1px;background:rgba(255,196,107,.4);
+    border-left:2px solid var(--warn);border-right:2px solid var(--warn);
+    box-shadow:0 0 0 1px rgba(255,196,107,.35);min-width:3px;border-radius:2px}
+  .dthead{position:absolute;top:0;bottom:0;width:2px;background:var(--ink);
+    pointer-events:none}
+  .dtskip{display:flex;gap:4px;flex-wrap:wrap;align-items:center}
+  .dtskip button{flex:1;min-width:34px;padding:6px 0;border-radius:5px;
+    border:1px solid var(--line);background:var(--panel);color:var(--ink);
+    font:600 10.5px var(--mono);cursor:pointer}
+  .dtskip button:hover{background:#2c313c;border-color:var(--warn)}
+  .dtskip .clenfield{flex:1.4;min-width:56px}
+  .chunkhead{display:flex;align-items:center;gap:9px}
+  .chunkhead b{font:600 11px var(--mono);letter-spacing:.1em;color:var(--warn)}
+  .chunkhead .state{font:10px var(--mono);color:var(--dim)}
+  .chunkhead .state.editing{color:var(--warn)}
+  /* grows into the space the file lists used to take, rather than leaving a gap;
+     the 16/10 is now a floor, not a cap */
+  .chunkvid{position:relative;background:#000;border:1px solid var(--warn);
+    border-radius:7px;min-height:min(34vh,260px);flex:1;display:flex;align-items:center;
+    justify-content:center;overflow:hidden}
+  .chunkvid video{max-width:100%;max-height:100%}
+  .chunkvid .none{color:var(--dim);font-size:12px}
+  .cbar{position:relative;height:6px;background:#12141a;border-radius:3px;overflow:hidden}
+  .cbar i{position:absolute;top:0;bottom:0;left:0;background:var(--warn);width:0}
+  .chunkctl{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+  .chunkctl .hint{font:10px var(--mono);color:var(--dim)}
+  .loopwrap{display:flex;align-items:center;gap:5px;font:10px var(--mono);
+    color:var(--dim);cursor:pointer}
+  .loopwrap input{accent-color:var(--warn)}
+  .modesw button.on{background:var(--pie-sheen);color:#fff}
+  .plan{border:1px solid var(--line);border-radius:7px;padding:9px 11px;background:#191c22}
+  .planrow{display:flex;justify-content:space-between;align-items:baseline;
+    font:10.5px var(--mono);color:var(--dim);padding:2px 0}
+  .planrow b{color:var(--ink);font-size:12px}
+  .planrow b.hot{color:var(--pie-sheen)}
+  .planwhy{margin-top:6px;font:10.5px var(--mono);color:var(--hot);line-height:1.45}
+
+  /* ---------- OUTPUT screen ---------- */
+  /* THEATER MODE. Josh, 2026-09-11: "when I click output it should be like a much more
+     just a playing interface because I don't need anything else... it should just be
+     something that's over the input interface, kind of like a theater mode. Like as if
+     it's going to be in YouTube almost, so I can get a realistic view of what the users
+     will see." So it floats OVER the work instead of replacing it, and everything that
+     isn't the player is gone. */
+  .outscreen{position:fixed;inset:0;z-index:50;background:rgba(8,10,14,.94);
+    backdrop-filter:blur(3px);display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:14px;padding:34px}
+  .outscreen .outvid{width:min(100%,1100px);aspect-ratio:16/9;max-height:72vh}
+  .outscreen .outscrubwrap{width:min(100%,1100px)}
+  /* the editing surfaces live on INPUT now — theater is for watching */
+  /* The moment map MOVED OUT of the theater overlay 2026-09-22. It had been left
+     inside `.outscreen` when the editing surfaces moved to INPUT, so this rule
+     hid it in EVERY view — the diagnosis and its one-click fixes were unreachable
+     anywhere, which is why Josh got a bare sentence and no way forward. */
+  .outscreen .chips{display:none!important}
+  .chipshead{display:flex;align-items:baseline;gap:10px;margin:14px 0 7px;font:10px var(--mono);letter-spacing:.09em}
+  .chipshead b{color:var(--ink)}
+  .work > .chipshead, .work > #chips{padding:0 16px}
+  .theaterclose{position:absolute;top:18px;right:22px}
+  .outtop{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .outvid{background:#000;border:1px solid var(--good);border-radius:8px;
+    min-height:0;display:flex;align-items:center;justify-content:center;overflow:hidden;
+    position:relative}
+  .outvid video{max-width:100%;max-height:100%}
+  /* The live caption. Mirrors the export's burn-in style (Helvetica, white on a soft
+     dark box, sat off the bottom edge) so what he tweaks here is what he ships.
+     left/bottom/font-size are set in JS from the video's real rendered rect. */
+  .subov{position:absolute;display:flex;justify-content:center;pointer-events:none;
+    text-align:center}
+  /* Karaoke, matching the burn-in: no grey box — bold white with a dark outline;
+     words not yet said are faded, the word being said is amber and a touch bigger.
+     Josh, 2026-09-23: "gray background, white lettering... not very pretty and it's
+     not by word." */
+  #subovtext{font:700 16px/1.32 Helvetica,var(--ui);color:#fff;
+    white-space:pre-wrap;max-width:92%;padding:0 .3em;
+    text-shadow:0 0 2px #000,0 0 2px #000,0 1px 3px #000,0 2px 8px rgba(0,0,0,.6)}
+  /* the word being said turns amber — nothing else changes: every word stays solid white
+     with the same outline, same size, nothing dimmed (Josh, 2026-09-26: the box was "too
+     dramatic" and the grey not-yet-said words were "hard to read"). Same as the export. */
+  #subovtext .kw{display:inline-block;color:#fff;transition:color .05s}
+  #subovtext .kw.now{color:#ffc850}
+  .chips{display:flex;gap:6px;flex-wrap:wrap}
+  .chip{display:flex;flex-direction:column;gap:3px;background:var(--panel-2);
+    border:1px solid var(--line);border-radius:6px;padding:7px 9px;min-width:104px;cursor:pointer}
+  .chip.play{border-color:var(--good);background:#1b2620}
+  .chip.editing{border-color:var(--warn);background:#2a2119}
+  .chip .n{font:600 11px var(--mono);color:var(--hot)}
+  .chip .t{font:10px var(--mono);color:var(--dim);white-space:nowrap;
+    overflow:hidden;text-overflow:ellipsis;max-width:130px}
+  .chip .ops{display:flex;gap:3px;margin-top:3px}
+  .chip .ops button{font:10px var(--mono);background:#12141a;border:1px solid var(--line);
+    color:var(--dim);border-radius:4px;padding:2px 5px;cursor:pointer}
+  .chip .ops button:hover{color:var(--ink);border-color:var(--dim)}
+
+  /* ---------- shared sidebar bits ---------- */
+  .side{padding:13px;overflow-y:auto;min-height:0}
+  .card{background:var(--panel-2);border:1px solid var(--line);border-radius:8px;
+    padding:10px;margin-bottom:8px}
+  .card .nm{font-size:12.5px;font-weight:600;word-break:break-all}
+  .card .meta{font:10px var(--mono);color:var(--dim);margin-top:3px}
+  .card.sel{border-color:var(--hot)}
+  .bar{height:4px;background:#12141a;border-radius:2px;margin-top:6px;overflow:hidden}
+  .bar i{display:block;height:100%;background:var(--warn);width:0}
+  h3{font:600 10px var(--mono);letter-spacing:.12em;text-transform:uppercase;
+    color:var(--dim);margin:14px 0 7px}
+  h3:first-child{margin-top:0}
+  .drop{border:1px dashed var(--line);border-radius:8px;padding:11px;text-align:center;
+    color:var(--dim);font-size:12px;cursor:pointer}
+  .drop:hover{border-color:var(--hot);color:var(--ink)}
+  .drop.over{border-color:var(--hot);background:#241d1b;color:var(--ink)}
+  input[type=file]{display:none}
+  .lens{display:flex;gap:5px}
+  .len{font:600 11px var(--mono);padding:6px 10px;border-radius:5px;cursor:pointer;
+    background:var(--panel-2);border:1px solid var(--line);color:var(--ink)}
+  .len.on{background:var(--warn);border-color:var(--warn);color:#221a10}
+  .prow,.exrow{display:flex;align-items:center;gap:7px;background:var(--panel-2);
+    border:1px solid var(--line);border-radius:6px;padding:7px 9px;margin-bottom:5px}
+  .prow .pn{flex:1;font-size:12px;font-weight:600;overflow:hidden;
+    text-overflow:ellipsis;white-space:nowrap}
+  .prow .pm,.exrow .pm{font:10px var(--mono);color:var(--dim)}
+  .prow.on{border-color:var(--warn)}
+  .prow button{font:10px var(--mono);background:#12141a;border:1px solid var(--line);
+    color:var(--dim);border-radius:4px;padding:3px 7px;cursor:pointer}
+  .exrow a{color:var(--good);font:11px var(--mono);text-decoration:none;flex:1;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .hint{font:11px var(--mono);color:var(--dim)}
+  .toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);
+    background:var(--panel-2);border:1px solid var(--line);border-radius:8px;
+    padding:10px 16px;font:12px var(--mono);z-index:50;display:none}
+  .toast.bad{border-color:var(--hot);color:#ffbfb2}
+  /* silence before/after an audio bed — two small steppers under its name */
+  .asspad{display:flex;gap:16px;flex-wrap:wrap;margin-top:6px;font:11px var(--mono);color:var(--dim)}
+  .asspad.busy{opacity:.5;pointer-events:none}
+  .padctl{display:inline-flex;align-items:center;gap:5px}
+  .padctl b{min-width:42px;text-align:center;color:var(--ink);font-weight:600}
+  .padctl button{width:22px;height:22px;border-radius:5px;border:1px solid var(--line);
+    background:var(--panel-2);color:var(--ink);font:13px var(--mono);cursor:pointer;padding:0}
+
+  /* Which output am I looking at — the two modes must never be confusable. */
+  .outtag{font:700 10px/1 var(--mono);letter-spacing:.09em;padding:5px 8px;border-radius:5px;
+          border:1px solid var(--line);white-space:nowrap}
+  .outtag.grab{background:#16202c;border-color:#2b4058;color:#8fc4ff}
+  .outtag.speed{background:#2a1d10;border-color:#5c3f1c;color:#ffc46b}
+
+  /* SPEED output: the back-and-forth, readable at a glance. */
+  .chip.seg{cursor:pointer}
+  .chip.seg .n{font:700 10px/1 var(--mono);letter-spacing:.07em}
+  .chip.seg.fast{background:#241a10;border-color:#5c3f1c}
+  .chip.seg.fast .n{color:#ffc46b}
+  .chip.seg.real{background:#12211a;border-color:#25543c}
+  .chip.seg.real .n{color:#7fe0ab}
+  .chip.seg.play{outline:2px solid var(--pie-sheen);outline-offset:1px}
+
+  /* "yours" vs "auto": the FAST pieces are not items he added, they are what the
+     tool does with everything he hasn't claimed. They must never read as
+     undeletable content. (Josh, 2026-09-09: "there was already a video added and
+     I couldn't remove it.") */
+  .chip.seg .mine{font:600 9px var(--mono);color:#7fe0ab;opacity:.85;letter-spacing:.06em}
+  .chip.seg .auto{font:600 9px var(--mono);color:var(--dim);opacity:.75;letter-spacing:.06em}
+  .chip.seg.fast{opacity:.72}
+  .chip.seg.real{opacity:1}
+  .segnote{flex:0 0 auto;max-width:340px;align-self:center;padding:9px 12px;border-radius:7px;
+    background:#191c22;border:1px dashed var(--line);font:11px/1.5 var(--mono);color:var(--dim)}
+  .segnote b{color:var(--ink)}
+
+  /* ================= MOBILE =================
+     Under the breakpoint the desktop app is hidden entirely and this takes over.
+     Speed mode only — no grab mode on a phone (his call). Thumb-sized targets,
+     tracks tall enough to drag, nothing that needs a hover. */
+  .m{display:none}
+  @media (max-width: 820px){
+    body{overflow:auto}
+    .app{display:none!important}
+    .m{display:flex!important;flex-direction:column;gap:10px;
+       padding:10px 12px calc(72px + env(safe-area-inset-bottom,0px));min-height:100vh}
+  }
+  .mtop{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+  .mbrand{font:600 17px/1 "Iowan Old Style",Georgia,serif}
+  .mplan{font:11px var(--mono);color:var(--warn);text-align:right;line-height:1.35}
+  .mstage{position:relative;background:#000;border:1px solid var(--line);border-radius:10px;
+    overflow:hidden;aspect-ratio:16/10;display:flex;align-items:center;justify-content:center}
+  .mstage video{width:100%;height:100%;object-fit:contain;display:block}
+  .mnone{position:absolute;padding:0 24px;text-align:center;color:var(--dim);
+    font:12px var(--mono);line-height:1.5}
+  .mlive{position:absolute;top:8px;right:8px;background:var(--hot);color:#fff;
+    font:700 10px var(--mono);letter-spacing:.1em;padding:4px 8px;border-radius:5px}
+
+  .mtrack{display:flex;flex-direction:column;gap:5px}
+  .mlab{display:flex;justify-content:space-between;font:10px var(--mono);color:var(--dim);
+    letter-spacing:.08em}
+  .mlab b{color:var(--ink)}
+  /* 44px tall: a thumb target, not a mouse target */
+  .mbar{position:relative;height:44px;background:var(--panel-2);border:1px solid var(--line);
+    border-radius:8px;overflow:hidden;touch-action:none;cursor:pointer}
+  .mbar.audio{height:34px;background:#1a2028}
+  .mhead{position:absolute;top:0;bottom:0;width:2px;background:var(--hot);left:0;
+    box-shadow:0 0 0 1px rgba(0,0,0,.5)}
+  .mhead::after{content:'';position:absolute;top:-3px;left:-7px;width:16px;height:16px;
+    border-radius:50%;background:var(--hot);box-shadow:0 1px 4px rgba(0,0,0,.6)}
+  .mmarks{position:absolute;inset:0}
+  .mmarks i{position:absolute;top:0;bottom:0;background:rgba(127,224,171,.34);
+    border-left:1px solid #7fe0ab;border-right:1px solid #7fe0ab}
+  .mmarks i.sel{background:rgba(127,224,171,.6)}
+  .mwin{position:absolute;top:0;bottom:0;background:rgba(211,162,92,.3);
+    border:1px dashed var(--warn);border-radius:3px;pointer-events:none}
+
+  .mrow{display:flex;gap:7px;flex-wrap:wrap}
+  .mbtn{flex:1 1 0;min-width:88px;min-height:44px;padding:10px 8px;border-radius:9px;
+    border:1px solid var(--line);background:var(--panel-2);color:var(--ink);
+    font:600 12px var(--mono);cursor:pointer;-webkit-tap-highlight-color:transparent}
+  .mbtn:active{background:#2c313c}
+  .mbtn.pri{background:var(--hot);border-color:var(--hot);color:#fff}
+  .mbtn.del{background:#2a1a1a;border-color:#5c2f2f;color:#e59d9d}
+
+  .mlens{display:flex;gap:6px}
+  .mlens button{flex:1;min-height:40px;border-radius:8px;border:1px solid var(--line);
+    background:var(--panel-2);color:var(--dim);font:600 12px var(--mono);cursor:pointer}
+  .mlens button.on{background:var(--warn);border-color:var(--warn);color:#221a10}
+
+  .mgo{min-height:56px;border-radius:11px;border:none;background:var(--good);
+    color:#0f2118;font:700 15px var(--mono);cursor:pointer;
+    -webkit-tap-highlight-color:transparent}
+  .mgo:active{filter:brightness(.92)}
+  .mgo:disabled{background:var(--panel-2);color:var(--dim);cursor:default}
+
+  .medit{display:flex;flex-direction:column;gap:7px;padding:10px;border-radius:10px;
+    background:#12211a;border:1px solid #25543c}
+  .meh{font:11px var(--mono);color:#a8d8bd}
+  .meh b{color:#fff}
+
+  .mlist{display:flex;flex-direction:column;gap:6px}
+  .mitem{display:flex;align-items:center;justify-content:space-between;gap:8px;
+    padding:11px 12px;border-radius:9px;background:var(--panel-2);
+    border:1px solid var(--line);font:12px var(--mono);cursor:pointer}
+  .mitem.real{border-color:#25543c;background:#12211a}
+  .mitem.sel{outline:2px solid var(--good)}
+  .mitem .w{color:var(--dim)}
+  .mitem b{color:#7fe0ab}
+  .mempty{padding:14px;border-radius:9px;border:1px dashed var(--line);
+    font:11.5px/1.6 var(--mono);color:var(--dim);text-align:center}
+
+  .mnav{position:fixed;left:0;right:0;bottom:0;display:flex;background:var(--panel);
+    border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px);z-index:20}
+  .mnav button{flex:1;min-height:60px;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;gap:3px;background:none;border:none;color:var(--dim);
+    font:600 10px var(--mono);letter-spacing:.09em;cursor:pointer}
+  .mnav button i{font-style:normal;font-size:17px}
+  .mnav button.on{color:var(--hot)}
+
+  /* mobile OUTPUT screen: the whole run at a glance, tap any piece to jump there */
+  #m-screen-in,#m-screen-out{display:flex;flex-direction:column;gap:10px}
+  .mseglist{display:flex;flex-direction:column;gap:6px}
+  .mseg{display:flex;align-items:center;justify-content:space-between;gap:10px;
+    padding:11px 12px;border-radius:9px;font:12px var(--mono);cursor:pointer;
+    border:1px solid var(--line);background:var(--panel-2)}
+  .mseg.real{background:#12211a;border-color:#25543c}
+  .mseg.real b{color:#7fe0ab}
+  .mseg.fast{opacity:.68}
+  .mseg.fast b{color:var(--warn)}
+  .mseg.play{outline:2px solid var(--hot)}
+  .mseg .w{color:var(--dim);font-size:11px}
+  .mmarks i.fastseg{background:rgba(211,162,92,.22);border-color:var(--warn)}
+
+  /* custom chunk length — the presets are shortcuts, the slider is the real control */
+  .mslider{display:flex;align-items:center;gap:12px}
+  .mslider input[type=range]{flex:1;height:44px;accent-color:var(--warn);background:none}
+  .mlenval{min-width:58px;text-align:right;font:700 14px var(--mono);color:var(--warn)}
+
+  /* ANDROID BACK-GESTURE: a horizontal drag near the screen edge is read by the OS
+     as back/forward navigation. Josh, 2026-09-09: "it thinks I'm actually switching
+     between screens or trying to go back." overscroll-behavior-x:none tells the
+     browser not to hand the gesture to navigation; the tracks also claim the
+     gesture with touch-action:none + preventDefault on pointerdown. */
+  html,body{overscroll-behavior-x:none;overscroll-behavior-y:auto}
+  @media (max-width: 820px){
+    html,body{overscroll-behavior:none}
+    .m{touch-action:pan-y}          /* vertical scroll yes, horizontal swipe ours */
+    .mbar{touch-action:none}        /* the tracks own horizontal entirely */
+  }
+
+  /* skip buttons — precise nudges, no gesture to fight */
+  .mskip{display:flex;gap:5px}
+  .mskip .sk{flex:1 1 0;min-width:0;padding:10px 2px;font:600 12px var(--mono);
+    min-height:46px;letter-spacing:-.02em}
+
+  /* FILES tab — the raw assets, plainly */
+  .mfhead{font:700 10px var(--mono);letter-spacing:.1em;color:var(--dim);margin-top:4px}
+  .mflist{display:flex;flex-direction:column;gap:9px}
+  .mfile{padding:11px 12px;border-radius:10px;background:var(--panel-2);
+    border:1px solid var(--line);display:flex;flex-direction:column;gap:8px}
+  .mfname{font:12px var(--mono);color:var(--ink);word-break:break-word;line-height:1.4}
+  .mfmeta{font:10.5px var(--mono);color:var(--dim)}
+  .mfile video{width:100%;border-radius:7px;background:#000;display:block}
+  .mfile audio{width:100%}
+  .mnav button i{font-style:normal;font-size:17px}
+
+  /* per-track controls: 8 tight buttons, thumb-sized but they must fit 412px */
+  .mskip .sk{flex:1 1 0;min-width:0;padding:9px 1px;font:600 11px var(--mono);
+    min-height:42px;letter-spacing:-.03em}
+  .mtrack .mskip{margin-top:2px}
+  /* typed duration — no slider */
+  .mslider{display:flex;align-items:center;gap:10px}
+  .mlenlab{font:10px var(--mono);color:var(--dim);letter-spacing:.06em;white-space:nowrap}
+  .mslider input[type=number]{flex:1;min-width:0;min-height:46px;padding:8px 12px;
+    border-radius:9px;border:1px solid var(--line);background:var(--panel-2);
+    color:var(--ink);font:700 16px var(--mono);text-align:center;-moz-appearance:textfield}
+  .mslider input[type=number]::-webkit-outer-spin-button,
+  .mslider input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+
+  /* mini editor — opens inside the OUTPUT list, under the moment he tapped.
+     Josh: "when I'm in the output section and I click on one of mine, then I should
+     almost open up like a mini editor... just to make it really easy on my brain." */
+  .mmini{margin:2px 0 6px;padding:12px;border-radius:10px;background:#12211a;
+    border:1px solid #25543c;display:flex;flex-direction:column;gap:10px}
+  .mmrow{display:flex;align-items:center;gap:8px}
+  .mmlab{flex:0 0 74px;font:10px var(--mono);color:#a8d8bd;letter-spacing:.06em}
+  .mmval{flex:1;min-width:0;min-height:42px;padding:6px 10px;border-radius:8px;
+    border:1px solid var(--line);background:var(--panel-2);color:var(--ink);
+    font:700 15px var(--mono);text-align:center;-moz-appearance:textfield}
+  .mmval::-webkit-outer-spin-button,.mmval::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+  .mmnudge{display:flex;gap:4px}
+  .mmnudge button{flex:1;min-width:0;min-height:40px;border-radius:7px;border:1px solid var(--line);
+    background:var(--panel-2);color:var(--ink);font:600 11px var(--mono);cursor:pointer;padding:0 2px}
+  .mmnudge button:active{background:#2c313c}
+  .mmfoot{display:flex;gap:7px}
+  .mmfoot button{flex:1;min-height:44px;border-radius:9px;font:600 12px var(--mono);cursor:pointer;
+    border:1px solid var(--line);background:var(--panel-2);color:var(--ink)}
+  .mmfoot .del{background:#2a1a1a;border-color:#5c2f2f;color:#e59d9d}
+  .mmfoot .done{background:var(--good);border-color:var(--good);color:#0f2118}
+
+  /* desktop moment editor */
+  .dmodal{position:fixed;inset:0;background:rgba(8,10,14,.72);z-index:60;
+    display:flex;align-items:center;justify-content:center;padding:24px}
+  .dpanel{width:min(980px,96vw);max-height:92vh;overflow:auto;background:var(--panel);
+    border:1px solid var(--line);border-radius:12px;box-shadow:0 18px 60px rgba(0,0,0,.6)}
+  .dhead{display:flex;align-items:center;gap:11px;padding:12px 15px;
+    border-bottom:1px solid var(--line)}
+  .dwhy{font:11px var(--mono);color:var(--warn)}
+  .dbody{display:grid;grid-template-columns:1.15fr 1fr;gap:16px;padding:15px}
+  @media (max-width:900px){ .dbody{grid-template-columns:1fr} }
+  .dpreview{display:flex;flex-direction:column;gap:7px}
+  .dpreview video{width:100%;aspect-ratio:16/10;object-fit:contain;background:#000;
+    border:1px solid var(--line);border-radius:9px}
+  .dpcap{font:10.5px var(--mono);color:var(--dim);text-align:center}
+  .dfields{display:flex;flex-direction:column;gap:13px}
+  .dfield label{display:block;font:10px var(--mono);letter-spacing:.09em;color:var(--dim);
+    margin-bottom:6px}
+  .drow{display:flex;gap:5px;align-items:center}
+  .drow button{min-width:40px;min-height:36px;border-radius:7px;border:1px solid var(--line);
+    background:var(--panel-2);color:var(--ink);font:600 11px var(--mono);cursor:pointer}
+  .drow button:hover{background:#2c313c}
+  .drow input{flex:1;min-width:0;min-height:36px;padding:6px 10px;border-radius:7px;
+    border:1px solid var(--line);background:var(--panel-2);color:var(--ink);
+    font:700 15px var(--mono);text-align:center;-moz-appearance:textfield}
+  .drow input::-webkit-outer-spin-button,.drow input::-webkit-inner-spin-button{
+    -webkit-appearance:none;margin:0}
+  .dplan{padding:10px 12px;border-radius:9px;background:#12211a;border:1px solid #25543c;
+    font:11px/1.6 var(--mono);color:#a8d8bd}
+  .dplan b{color:#fff}
+  .dfoot{display:flex;gap:8px}
+  .dfoot .btn{flex:1}
+
+  /* the chunk is DRAGGABLE on the desktop scrub bar (Josh, 2026-09-10:
+     "is there any way to move the chunk with my mouse... a little grabber on it") */
+  .scrub .chunkmark{cursor:grab;pointer-events:auto;touch-action:none}
+  .scrub .chunkmark:active{cursor:grabbing}
+  .scrub .chunkmark i{pointer-events:none}
+  /* invisible grab pad — the band can be a few px wide on a long input */
+  .scrub .chunkmark::before{content:'';position:absolute;top:0;bottom:0;
+    left:-9px;right:-9px;cursor:grab}
+  .scrub .chunkmark i{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+    width:14px;height:18px;border-radius:3px;background:var(--warn);opacity:.95;
+    box-shadow:0 1px 4px rgba(0,0,0,.5);pointer-events:none}
+  .scrub .chunkmark i::after{content:'';position:absolute;left:4px;right:4px;top:4px;bottom:4px;
+    border-left:1px solid rgba(0,0,0,.45);border-right:1px solid rgba(0,0,0,.45)}
+  .scrub.dragging{cursor:grabbing}
+
+  /* the OUTPUT timeline — click anywhere to drop the playhead and play from there */
+  .outscrubwrap{display:flex;flex-direction:column;gap:5px;padding:0 2px}
+  .scrub.outscrub{position:relative;height:34px;min-height:34px;flex:0 0 34px;
+    background:var(--panel-2);border:1px solid var(--line);border-radius:8px;
+    overflow:hidden;cursor:pointer}
+  .osegs{position:absolute;inset:0}
+  .osegs i{position:absolute;top:0;bottom:0}
+  .osegs i.real{background:rgba(127,224,171,.38);border-left:1px solid #7fe0ab;
+    border-right:1px solid #7fe0ab}
+  .osegs i.fast{background:rgba(211,162,92,.16)}
+  .ohead{position:absolute;top:0;bottom:0;width:2px;background:var(--hot);left:0;
+    box-shadow:0 0 0 1px rgba(0,0,0,.5)}
+  .ohead::after{content:'';position:absolute;top:-4px;left:-6px;width:14px;height:14px;
+    border-radius:50%;background:var(--hot);box-shadow:0 1px 4px rgba(0,0,0,.6)}
+  .oscrubhint{font:10px var(--mono);color:var(--dim);text-align:center}
+
+  /* desktop AUDIO placement, speed mode — mirrors the phone's audio track */
+  .dabed{display:flex;flex-direction:column;gap:7px;padding:9px 11px;border-radius:8px;
+    background:#1a2028;border:1px solid var(--line)}
+  .dabedhead{display:flex;align-items:center;gap:8px;font:10px var(--mono);
+    letter-spacing:.08em;color:var(--dim)}
+  .dabedhead b{color:var(--ink)}
+  .dabar{position:relative;height:26px;background:#12141a;border:1px solid var(--line);
+    border-radius:6px;overflow:hidden;cursor:pointer}
+  .damarks{position:absolute;inset:0}
+  .damarks i{position:absolute;top:0;bottom:0;background:rgba(127,224,171,.36);
+    border-left:1px solid #7fe0ab;border-right:1px solid #7fe0ab}
+  .dahead{position:absolute;top:0;bottom:0;width:2px;background:var(--hot);left:0}
+  .dahead::after{content:'';position:absolute;top:-3px;left:-5px;width:12px;height:12px;
+    border-radius:50%;background:var(--hot)}
+  .daskip{display:flex;gap:4px}
+  .daskip button{flex:1;min-width:0;min-height:30px;border-radius:6px;
+    border:1px solid var(--line);background:var(--panel-2);color:var(--ink);
+    font:600 10.5px var(--mono);cursor:pointer;padding:0 2px}
+  .daskip button:hover{background:#2c313c}
+  .dahint{font:10px var(--mono);color:var(--dim)}
+  .dahint b{color:var(--good)}
+
+  /* type any chunk length — the presets are shortcuts, not the limit */
+  .clenfield{width:66px;min-height:28px;padding:4px 6px;border-radius:6px;
+    border:1px solid var(--line);background:var(--panel-2);color:var(--ink);
+    font:700 12px var(--mono);text-align:center;-moz-appearance:textfield}
+  .clenfield::-webkit-outer-spin-button,.clenfield::-webkit-inner-spin-button{
+    -webkit-appearance:none;margin:0}
+
+  /* modal: loop the moment with its audio, right where he is editing it */
+  .dloop{display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:8px;
+    background:#1a2028;border:1px solid var(--line)}
+  .dloop .hint{font:10.5px var(--mono);color:var(--warn)}
+  /* colour-code his moments so a chip maps to a band on the timeline */
+  .chip.seg.real .dot{display:inline-block;width:8px;height:8px;border-radius:2px;
+    margin-right:6px;vertical-align:middle}
+  .chip.seg.real.m0 .dot,.osegs i.m0{background:#7fe0ab}
+  .chip.seg.real.m1 .dot,.osegs i.m1{background:#6bb6ff}
+  .chip.seg.real.m2 .dot,.osegs i.m2{background:#ffc46b}
+  .chip.seg.real.m3 .dot,.osegs i.m3{background:#e59dd6}
+  .chip.seg.real.m4 .dot,.osegs i.m4{background:#9de5df}
+  .chip.seg.real.m5 .dot,.osegs i.m5{background:#f0a58a}
+  .chip.seg.real.m0{border-color:#7fe0ab}.chip.seg.real.m1{border-color:#6bb6ff}
+  .chip.seg.real.m2{border-color:#ffc46b}.chip.seg.real.m3{border-color:#e59dd6}
+  .chip.seg.real.m4{border-color:#9de5df}.chip.seg.real.m5{border-color:#f0a58a}
+  .chip.seg.editing{outline:2px solid var(--warn);outline-offset:1px}
+  /* THE MOMENT MAP — two tracks, so a crossing is something you SEE, not read */
+  .mmap{display:flex;flex-direction:column;gap:0;padding:10px 12px;border-radius:8px;
+    background:var(--panel-2);border:1px solid var(--line)}
+  .mmaphead{display:flex;align-items:center;gap:9px;margin-bottom:7px}
+  .mmaphead b{font:700 10px var(--mono);letter-spacing:.09em;color:var(--ink)}
+  .mmaphead .hint{font:10.5px var(--mono)}
+  .mmaprow{display:flex;align-items:center;gap:8px}
+  .mmaplbl{font:10px var(--mono);letter-spacing:.08em;color:var(--dim);width:42px;
+    text-align:right;flex:none}
+  .mmaptrack{position:relative;flex:1;height:30px;border-radius:5px;
+    background:#15181f;border:1px solid var(--line)}
+  .mmaptrack.vid{background:#14171d}
+  .mmapblk{position:absolute;top:3px;bottom:3px;border-radius:4px;cursor:grab;
+    display:flex;align-items:center;justify-content:center;overflow:hidden;
+    font:700 10px var(--mono);color:#10131a;min-width:11px;
+    border:1px solid rgba(0,0,0,.35);touch-action:none;user-select:none}
+  .mmapblk:active{cursor:grabbing}
+  .mmapblk.vid{cursor:default;opacity:.92}
+  .mmapblk.bad{outline:2px solid #ff6b63;outline-offset:1px;z-index:3}
+  /* amber, not red: the film BUILDS — this is only a note that a stretch may be
+     too fast to read. Red is reserved for "will not build". */
+  .mmapblk.warn{outline:2px dashed #e8a93f;outline-offset:1px;z-index:2}
+  /* a moment whose footage was trimmed away — still listed, clearly not in the video */
+  .mmapblk.cut{opacity:.3;filter:grayscale(1)}
+  .mmapblk.sel{outline:2px solid var(--ink);outline-offset:1px;z-index:4}
+  /* sits in the same column as the tracks (label width + its gap), so a line meets
+     the block it belongs to rather than floating off to one side */
+  .mmaplinks{margin-left:50px;width:calc(100% - 50px);height:26px;display:block;
+    overflow:visible;pointer-events:none}
+  .mmapempty{font:11px var(--ui);color:var(--dim);padding:6px 2px}
+  /* one-click fixes, each carrying the real numbers it will apply */
+  .mmapfix{display:flex;gap:7px;flex-wrap:wrap;margin-top:9px}
+  .fixbtn{display:flex;flex-direction:column;gap:2px;align-items:flex-start;text-align:left;
+    padding:8px 11px;border-radius:7px;border:1px solid var(--good);
+    background:#18241d;cursor:pointer;max-width:290px}
+  .fixbtn:hover{background:#1e2d24}
+  .fixbtn b{font:600 11.5px var(--ui);color:var(--good)}
+  .fixbtn span{font:10.5px var(--mono);color:var(--dim);line-height:1.35;white-space:normal}
+  .fixbtn.danger{border-color:#5c2f2f;background:#2a1a1a}
+  .fixbtn.danger b{color:#e59d9d}
+
+  /* a plan that can't be arranged — say which moment and why, right where he edits it */
+  .conflict{flex-basis:100%;display:flex;flex-direction:column;gap:3px;padding:9px 11px;
+    border-radius:7px;background:#2a1a1a;border:1px solid #5c2f2f}
+  .conflict b{font:700 11px var(--mono);letter-spacing:.06em;color:#e59d9d}
+  .conflict span{font:11.5px var(--ui);color:var(--ink);line-height:1.45}
+  /* must out-specify .chip.seg.real.mN, which also sets border-color */
+  .chip.seg.real.bad,.chip.bad{border-color:#c2544f;background:#2a1a1a}
+  .chip .whybad{font:10.5px var(--ui);color:#e59d9d;line-height:1.35;
+    max-width:180px;white-space:normal;margin-top:2px}
+  .osegs i.real{border-left:1px solid rgba(255,255,255,.5);border-right:1px solid rgba(255,255,255,.5)}
+
+  /* ASSETS screen — the raw files, playable and reorderable, off the chunk panel */
+  .assetscreen{display:flex;flex-direction:column;gap:10px;
+    padding:14px;height:100%;min-height:0;overflow:auto}
+  .asstop{display:flex;align-items:center;gap:10px;font:10px var(--mono);
+    letter-spacing:.09em;color:var(--dim)}
+  .asstop b{color:var(--ink);font-size:11px}
+  .asslist{display:flex;flex-direction:column;gap:9px}
+  .assrow{display:grid;grid-template-columns:auto 260px 1fr auto;gap:12px;align-items:center;
+    padding:10px 12px;border-radius:9px;background:var(--panel-2);border:1px solid var(--line)}
+  .assnum{font:700 12px var(--mono);color:var(--dim);width:22px;text-align:center}
+  .assrow video,.assrow audio{width:100%;border-radius:6px;background:#000;display:block}
+  .assmeta{font:11px var(--mono);color:var(--ink);line-height:1.5;word-break:break-word}
+  .assmeta .s{color:var(--dim);font-size:10.5px}
+  /* the clip / audio name — click it to rename (dotted underline says it's editable) */
+  .assname{cursor:text;border-bottom:1px dotted transparent;padding:0 2px;border-radius:3px}
+  .assname:hover{border-bottom-color:var(--dim)}
+  .assname:hover::after{content:' ✎';color:var(--dim)}
+  .assname.editing{outline:1px solid var(--warn);background:#12141a;cursor:text}
+  .assname.editing::after{content:''}
+  .assmeta .prep{color:var(--warn)}
+  /* the source-file line under a split piece — present but quiet, so the piece's own
+     length stays the number the eye lands on */
+  .assmeta .sub{opacity:.6;font-size:10px}
+  /* trim status on the row — the editing happens in the modal */
+  /* ONE control strip per row (2026-09-14) — toggle, trim, order, delete, then status.
+     Josh: "get all that in one easy to read spot... use a toggle." */
+  .assbar{display:flex;align-items:center;gap:6px;margin-top:8px;flex-wrap:wrap}
+  .assbar button{padding:5px 10px;border-radius:6px;border:1px solid var(--line);
+    background:var(--panel);color:var(--ink);font:600 11px var(--mono);cursor:pointer}
+  .assbar button:hover{background:#2c313c;border-color:var(--ink)}
+  .assbar button.sq{padding:5px 8px;min-width:30px;color:var(--dim)}
+  .assbar button.sq:hover{color:var(--ink)}
+  .assbar button.del:hover{background:#2a1a1a;border-color:#5c2f2f;color:#e59d9d}
+  .asstoggle{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;
+    border-radius:6px;border:1px solid var(--line);background:var(--panel);
+    font:600 11px var(--mono);color:var(--dim);cursor:pointer;user-select:none}
+  .asstoggle.on{border-color:var(--good);color:var(--good);background:#18241d}
+  .asstoggle input{accent-color:var(--good);margin:0;cursor:pointer}
+  .assrow.archived{opacity:.5;border-style:dashed}
+  .assrow.archived video{filter:grayscale(1)}
+  .offlbl{color:var(--warn)}
+  .asstrim{display:flex;align-items:center;gap:6px;margin-top:7px;flex-wrap:wrap}
+  .asstrim button{padding:4px 9px;border-radius:5px;border:1px solid var(--line);
+    background:var(--panel);color:var(--ink);font:600 10.5px var(--mono);cursor:pointer}
+  .asstrim button:hover{background:#2c313c;border-color:var(--good)}
+  .asstrimlbl{font:10.5px var(--mono);color:var(--dim)}
+  .asstrimlbl b{color:var(--good)}
+
+  /* THE TRIM MODAL — the kept range is the thing you look at and drag */
+  .trimbar{position:relative;height:34px;border-radius:6px;background:#12151b;
+    border:1px solid var(--line);margin-top:5px;cursor:pointer;touch-action:none}
+  .trimkeep{position:absolute;top:0;bottom:0;background:rgba(127,224,171,.22);
+    border-left:2px solid var(--good);border-right:2px solid var(--good)}
+  .trimhandle{position:absolute;top:-3px;bottom:-3px;width:14px;margin-left:-7px;
+    border-radius:4px;background:var(--good);cursor:ew-resize;touch-action:none;
+    box-shadow:0 1px 4px rgba(0,0,0,.5)}
+  .trimhandle:active{filter:brightness(1.2)}
+  .trimhead{position:absolute;top:0;bottom:0;width:2px;background:var(--warn);
+    pointer-events:none}
+  .trimscale{display:flex;justify-content:space-between;margin-top:4px;
+    font:10px var(--mono);color:var(--dim)}
+  .trimnow{font:11px var(--mono);color:var(--warn);margin-top:5px}
+  .trimlab{font:10px var(--mono);color:var(--dim)}
+  .trimsum{font:11px var(--mono);color:var(--ink);margin-top:6px}
+  .trimsum b{color:var(--good)}
+  .trimwarn{margin-top:7px;padding:7px 9px;border-radius:6px;background:#2a1a1a;
+    border:1px solid #5c2f2f;font:11px var(--ui);color:#e59d9d;line-height:1.4}
+  .dfields button.wide{padding:7px 10px}
+  /* stand-in for a clip whose proxy isn't built yet — same footprint as the player,
+     so the row doesn't jump when the real video appears */
+  .assprep{width:100%;aspect-ratio:16/9;border-radius:6px;background:#000;
+    border:1px dashed var(--line);display:flex;align-items:center;justify-content:center;
+    font:600 11px var(--mono);color:var(--warn)}
+  .assops{display:flex;gap:5px}
+  .assops button{min-width:34px;min-height:32px;border-radius:6px;border:1px solid var(--line);
+    background:var(--panel);color:var(--ink);font:600 11px var(--mono);cursor:pointer}
+  .assops button:hover{background:#2c313c}
+  .assops button.del{background:#2a1a1a;border-color:#5c2f2f;color:#e59d9d}
+  /* the add-a-file target, sitting directly under the list it feeds */
+  .assdrop{padding:12px;text-align:center;font:600 12px var(--mono);flex:none}
+  /* INPUT VIDEOS as a GRID of draggable cards (Josh, 2026-09-23): "maybe three wide on
+     full screen. So I can kind of shovel things around." 3 across on a wide desktop,
+     2 on a narrower window, 1 on the phone (where ▲▼ still do the moving). */
+  .asslist.assgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+  @media (max-width:1250px){ .asslist.assgrid{grid-template-columns:repeat(2,minmax(0,1fr))} }
+  @media (max-width:820px){ .asslist.assgrid{grid-template-columns:1fr} }
+  .assrow.asscard{display:flex;flex-direction:column;align-items:stretch;gap:8px;
+    position:relative;padding:9px 10px 10px}
+  .asshead{display:flex;align-items:center;gap:6px;margin:-2px 0 -2px}
+  .assgrip{cursor:grab;color:var(--dim);font-size:15px;line-height:1;padding:2px 4px;
+    border-radius:4px;user-select:none}
+  .asscard:hover .assgrip{color:var(--ink);background:#2c313c}
+  .asshead .assnum{width:auto;text-align:left}
+  .assadd{min-width:28px;height:24px;border-radius:6px;border:1px dashed var(--line);
+    background:transparent;color:var(--dim);font:700 13px var(--mono);cursor:pointer}
+  .assadd:hover{border-color:var(--good);color:var(--good);background:#18241d}
+  .asscard.dragging{opacity:.35}
+  .asscard.dropbefore::before,.asscard.dropafter::after{content:'';position:absolute;
+    top:4px;bottom:4px;width:4px;border-radius:2px;background:var(--hot);
+    box-shadow:0 0 10px var(--hot)}
+  .asscard.dropbefore::before{left:-9px}
+  .asscard.dropafter::after{right:-9px}
+  .assmark{font:10px var(--mono);color:var(--good)}
+
+  /* transcript — belongs to the AUDIO BED, not the video */
+  .trlist{display:flex;flex-direction:column;gap:5px}
+  .trrow{display:grid;grid-template-columns:96px 1fr auto;gap:10px;align-items:center;
+    padding:7px 10px;border-radius:7px;background:var(--panel-2);border:1px solid var(--line)}
+  .trrow.play{outline:2px solid var(--hot);outline-offset:1px}
+  .trtime{font:10.5px var(--mono);color:var(--dim);text-align:right}
+  .trtext{width:100%;min-height:30px;padding:5px 8px;border-radius:6px;
+    border:1px solid transparent;background:none;color:var(--ink);
+    font:12.5px/1.45 -apple-system,BlinkMacSystemFont,sans-serif;resize:vertical}
+  .trtext:focus{border-color:var(--line);background:var(--panel);outline:none}
+  .trgo{min-width:30px;min-height:28px;border-radius:6px;border:1px solid var(--line);
+    background:var(--panel);color:var(--ink);font:10px var(--mono);cursor:pointer}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <a class="brand" href="/" title="Magpie — collects the good bits">
+      <svg class="mark" viewBox="0 0 44 32" aria-hidden="true">
+        <!-- a magpie in profile, drawn LIGHT so it reads on a dark header -->
+        <!-- long tail -->
+        <path d="M23.4 13.2 C30 15.6 36.6 19.4 42.4 24.2 C41.4 25.6 40.2 26.4 38.8 26.6
+                 C33 22.4 27.6 18.8 22.6 17.8 Z" fill="var(--pie-sheen)"/>
+        <!-- body -->
+        <path d="M9 15 C9 9.6 13.6 6.4 18.4 6.9 C23.4 7.4 26 11 25.6 15.4
+                 C25.2 19.8 21.6 22.6 17 22.4 C12.4 22.2 9 19.4 9 15 Z"
+              fill="var(--pie-light)"/>
+        <!-- black cap, bib and wing — the pied markings -->
+        <path d="M9.6 12.4 C10.6 8.6 14 6.6 17.6 6.9 L16.6 12.2 Z" fill="var(--pie-dark2)"/>
+        <path d="M18.4 8.2 C23 9 25.8 12 25.6 15.6 C25.4 18.6 23.6 20.8 21 21.8
+                 C22.4 17.6 21.4 12.4 18.4 8.2 Z" fill="var(--pie-dark2)"/>
+        <!-- head -->
+        <circle cx="9.6" cy="12.2" r="4.6" fill="var(--pie-dark2)"/>
+        <circle cx="8.6" cy="11.2" r="1.35" fill="#fff"/>
+        <circle cx="8.3" cy="11.2" r="0.68" fill="#11141a"/>
+        <!-- beak -->
+        <path d="M5.4 12.6 L0.8 13.9 L5.4 15.2 Z" fill="var(--pie-beak)"/>
+        <!-- legs -->
+        <path d="M15 22.2 v4 M19 22 v4" stroke="var(--pie-beak)" stroke-width="1.4"
+              stroke-linecap="round"/>
+      </svg>
+      <span class="word">Magpie</span>
+    </a>
+    <!-- ONE place for everything about the FILE. Josh, 2026-09-15: "you need to get all
+         this in one spot and in a way that makes total sense, is very logical."
+         Reads left to right as: which project · open another · export it · start over.
+         "Exports" is GONE — films go to Downloads now, so a second list of them was just
+         another button he had to guess the meaning of. -->
+    <div class="projbox">
+      <span class="projlabel">Project</span>
+      <span class="projname" id="projname" title="click to rename this project">Untitled</span>
+      <button class="btn sm" id="openproj" title="Open another project">Open<span id="projcount"></span></button>
+      <button class="btn ok sm" id="render" title="Export a film">Export…</button>
+      <button class="btn sm danger" id="reset"
+              title="Empty this project and start over — your saved projects and your videos are untouched">Start over</button>
+    </div>
+    <div class="screens modesw">
+      <button id="md-grab" class="on">GRAB</button>
+      <button id="md-ramp">SPEED</button>
+    </div>
+    <div class="screens">
+      <button id="sc-input" class="on">INPUT <span class="kk">I</span></button>
+      <button id="sc-output" class="out">OUTPUT <span id="outbadge"></span> <span class="kk">O</span></button>
+      <button id="sc-assets">ASSETS <span class="kk">A</span></button>
+    </div>
+    <span class="sp"></span>
+    <span class="hint" id="srcname">no video loaded</span>
+  </header>
+
+  <!-- ================= CHAPTER STRIP =================
+       One active chapter at a time. Clicking one swaps the WHOLE app over to it —
+       its clips, its audio, its moments, even the mode it was left in. -->
+  <div class="chapbar" id="chapbar">
+    <span class="chaplabel">Chapter</span>
+    <span id="chaptabs" style="display:contents"></span>
+    <button class="chapadd" id="chapadd" title="Start a new, empty chapter">+ NEW</button>
+  </div>
+
+  <!-- ================= INPUT SCREEN ================= -->
+  <div class="work" id="screen-input">
+    <div class="left">
+      <!-- ===== THE CHUNK IS THE SCREEN NOW =====
+           Josh, 2026-09-11: "the left hand side of the input screen on desktop is
+           useless... we need to double down on the chunk and just make that the whole
+           screen... I want audio and video to have like a very similar track situation
+           right next to each other, but it's very obvious as to which one you're
+           controlling... you can see [the duration] both over the audio and over the
+           video... adjust it with little bars too, like I can drag it to get certain
+           footage."
+           So: the chunk's own player is the stage, and the two tracks sit under it with
+           the SAME block drawn on both — video shows what you grab, audio shows where it
+           lands. Drag the block's middle to slide it, its edges to resize. -->
+      <!-- THE STAGE: the video as big as the screen allows, with the transport beside it.
+           Josh, 2026-09-22: "we gotta get the ability to pause and play to be a little bit
+           better... maximize the screen above it... we'll have a little bit of like a right
+           bar... if we need any functionality, like pausing and playing, the looping,
+           it might be good to go there on the side." -->
+      <div class="stage">
+        <div class="vidwrap">
+        <video id="cv" preload="auto" muted></video>
+        <div class="empty" id="cnone">Add a video on the ASSETS screen to start.</div>
+        <div class="stagetag" id="stagetag">CHUNK</div>
+        </div>
+        <div class="transport" id="transport">
+          <button class="tpbig" id="cplay">▶ Play</button>
+          <div class="tpkey"><kbd>space</kbd> or <kbd>P</kbd></div>
+          <label class="tptog"><input type="checkbox" id="looppre" checked><span>⟲ Loop</span><kbd>L</kbd></label>
+          <label class="tptog" id="chunkaudwrap"><input type="checkbox" id="chunkaud" checked><span>♪ Audio</span><kbd>M</kbd></label>
+          <button class="tpmark" id="tpmark">✚ Mark it <kbd>G</kbd></button>
+          <button class="tpremove" id="tpremove" hidden>✕ Remove this chunk</button>
+          <div class="tpstate" id="chunkstate">new — not added yet</div>
+          <div class="tpsp"></div>
+          <div class="tpkeys"><kbd>← →</kbd> move · <kbd>R</kbd>+<kbd>← →</kbd> length</div>
+          <button class="btn sm" id="addaudio">+ audio bed</button>
+        </div>
+      </div>
+
+      <!-- THE READOUT, left of both tracks. Josh, 2026-09-23: "what the length was, where
+           it starts at and how much of the video it takes and where the video starts at,
+           kinda all in one spot visually on the left... I can't just type in a value."
+           Every number here is typeable (seconds, or m:ss.xx); Enter applies it. -->
+      <div class="gtwrap">
+      <div class="gtsum" id="gtsum">
+        <div class="gsrow vid"><label for="posfield"><i class="sym">🎞</i>VIDEO START</label>
+          <input id="posfield" class="gsin" inputmode="decimal" title="type a time — 63.08 or 1:03.08">
+          <span class="gsnote" id="gs-vnote">—</span></div>
+        <div class="gsrow aud"><label for="aposfield"><i class="sym">🎙</i>AUDIO AT</label>
+          <input id="aposfield" class="gsin" inputmode="decimal" title="type a time — 0.5 or 0:00.50">
+          <span class="gsnote" id="gs-anote">—</span></div>
+        <!-- RATE: how fast this chunk plays. Josh, 2026-09-24: "instead of making it always
+             real time... double time or half time or whatever". 1 = real time. -->
+        <div class="gsrow grate"><label for="ratefield"><i class="sym">⏩</i>RATE</label>
+          <div class="gsratebar">
+            <input id="ratefield" class="gsin" inputmode="decimal" title="1 = real time · 2 = double · 0.5 = half">
+            <button data-grate="0.5">½×</button><button data-grate="1">1×</button><button data-grate="2">2×</button>
+          </div>
+          <span class="gsnote" id="gs-rnote">real time</span></div>
+        <div class="gsrow glen"><label for="clenfield"><i class="sym">⏱</i>LENGTH</label>
+          <input type="number" id="clenfield" class="gsin" step="0.1" min="0.1" max="600"
+                 inputmode="decimal" title="type any length in seconds">
+          <span class="gsnote" id="gs-lnote">—</span></div>
+      </div>
+      <div class="gtcol">
+      <!-- VIDEO track: the whole stitched input, with the chunk drawn on it -->
+      <div class="gtrack" id="gt-video">
+        <div class="gtlab"><b><i class="sym">🎞</i>VIDEO</b>
+          <span class="gtsub" id="gt-vsub">—</span>
+          <span class="sp" style="flex:1"></span>
+          <span class="gthint">drag the middle to move · drag an edge to resize</span>
+        </div>
+        <div class="gtbar" id="gt-vbar">
+          <div class="gtseams" id="gt-vseams"></div>
+          <div class="gtmarks" id="gt-vmarks"></div>
+          <!-- THREE SEPARATE TARGETS, never stacked. Josh, 2026-09-12: "make it really
+               clear when I'm moving one of the edges versus when I'm moving the whole
+               thing... don't combine the interaction as much."
+               The BLOCK is a pure readout (no pointer events) so it can be as thin as
+               the truth requires. The two edge grips and the move bar are siblings
+               positioned next to it — they never shrink it and never overlap. -->
+          <div class="gtblock" id="gt-vblock"></div>
+          <i class="gedge l" id="gt-el" title="drag: move the START"></i>
+          <i class="gedge r" id="gt-er" title="drag: move the END"></i>
+          <i class="gmove" id="gt-mv" title="drag: move the whole chunk"></i>
+          <div class="gthead" id="gt-vhead"></div>
+        </div>
+        <div class="gtskip pos">
+          <span class="gtlenlab"><i class="sym">🎞</i>STARTS AT <b id="posval">0:00</b></span>
+          <button data-vskip="-15">−15</button><button data-vskip="-5">−5</button>
+          <button data-vskip="-1">−1</button><button data-vskip="-0.5">−.5</button>
+          <button data-vskip="0.5">+.5</button><button data-vskip="1">+1</button>
+          <button data-vskip="5">+5</button><button data-vskip="15">+15</button>
+        </div>
+
+      </div>
+
+      <!-- AUDIO track: the same block, where it LANDS in the narration -->
+      <div class="gtrack" id="gt-audio">
+        <div class="gtlab"><b><i class="sym">🎙</i>AUDIO</b>
+          <span class="gtsub" id="gt-asub">—</span>
+          <span class="sp" style="flex:1"></span>
+          <!-- 🔇 insert silence at LANDS AT (Josh, 2026-09-25: "a bit of silence... so that I
+               can show the screen"). The audio file itself gets the gap, so every view and the
+               export respect it. -->
+          <span class="silctl" title="insert silence into the audio at LANDS AT — everything after it moves later">
+            <input id="silfield" type="number" step="0.5" min="0.1" max="60" value="2" inputmode="decimal">
+            <span class="silunit">s</span>
+            <button class="btn sm" id="siladd">＋ silence here</button>
+          </span>
+          <button class="btn sm" id="gt-aplay">▶</button>
+        </div>
+        <div class="gtbar audio" id="gt-abar">
+          <div class="gtsil" id="gt-asil"></div>
+          <div class="gtmarks" id="gt-amarks"></div>
+          <div class="gtblock audio" id="gt-ablock"></div>
+          <div class="gthead" id="gt-ahead"></div>
+        </div>
+        <div class="gtskip aud">
+          <span class="gtlenlab"><i class="sym">🎙</i>LANDS AT <b id="aposval">0:00</b></span>
+          <button data-da="-15">−15</button><button data-da="-5">−5</button>
+          <button data-da="-1">−1</button><button data-da="-0.5">−.5</button>
+          <button data-da="0.5">+.5</button><button data-da="1">+1</button>
+          <button data-da="5">+5</button><button data-da="15">+15</button>
+        </div>
+        <!-- LENGTH LIVES UNDER THE AUDIO. Josh, 2026-09-22: "there's two things about
+             the audio, where it lands in the audio and how long it is... I would like
+             for the length buttons to actually go underneath the audio section on both
+             the main page and when I click edit." Order on BOTH screens is now
+             video (gold) → audio (green) → length (blue). -->
+        <div class="gtskip len">
+          <span class="gtlenlab"><i class="sym">⏱</i>LENGTH <b id="clen">1.0s</b></span>
+          <button data-lskip="-1">−1</button><button data-lskip="-0.5">−.5</button>
+          <button data-lskip="-0.1">−.1</button>
+          <button data-lskip="0.1">+.1</button><button data-lskip="0.5">+.5</button>
+          <button data-lskip="1">+1</button>
+        </div>
+        <!-- loop + audio-on-the-chunk + add-an-audio-bed, the only survivors of the
+             old side tray. MARK stays a shortcut (G) — "it already is". -->
+      </div>
+      </div><!-- /gtcol -->
+      </div><!-- /gtwrap -->
+
+<!-- YOUR CHUNKS / MOMENTS — the list you edit, reorder and delete from.
+     Josh, 2026-09-22: "now I have nowhere to actually eliminate chunks out of an
+     output... I don't have anywhere to edit the individual chunks like I used to.
+     I want that interface back." It was never deleted: since 2026-09-11 it sat
+     inside the full-screen player, where `.outscreen .chips{display:none}` hid it
+     — the commit meant to MOVE the editing surfaces to this screen hid them instead.
+     The moment map had the identical defect and was moved here earlier today;
+     this is its twin. -->
+<div class="chipshead"><b>YOUR CHUNKS</b><span class="hint" id="chipshint">◀ ▶ move · ✕ remove · click one to edit</span></div>
+<div class="chips" id="chips"></div>
+<!-- THE MOMENT MAP. Josh, 2026-09-11: "I should be able to see my moments in a way
+         that I can like see them on a timeline, move them back and forth as needed...
+         right now we have this like verbal descriptions... I can't visualize what the
+         problem is and if I saw them like overlapping on a timeline, that might be more
+         helpful." Two tracks: where each moment lands in the AUDIO (top) and what it
+         points at in the VIDEO (bottom). The connecting line CROSSES when a moment is
+         out of order — the thing words couldn't show. Drag a block to move it. -->
+    <div class="mmap" id="mmap" hidden>
+      <div class="mmaphead">
+        <b>YOUR MOMENTS</b>
+        <span class="hint" id="mmapmsg">—</span>
+        <span class="sp" style="flex:1"></span>
+        <span class="hint">drag a block sideways to move it · click to edit</span>
+      </div>
+      <div class="mmaprow">
+        <span class="mmaplbl">AUDIO</span>
+        <div class="mmaptrack" id="mmap-audio"></div>
+      </div>
+      <svg class="mmaplinks" id="mmap-links"></svg>
+      <div class="mmaprow">
+        <span class="mmaplbl">VIDEO</span>
+        <div class="mmaptrack vid" id="mmap-video"></div>
+      </div>
+      <!-- Don't just name the problem — offer the likely fixes, with real numbers.
+           Josh, 2026-09-11: "why can't you just help me figure out how to fix it?...
+           suggestions for you like the things that you're likely wanting to do". -->
+      <div class="mmapfix" id="mmapfix" hidden></div>
+    </div>
+    </div>
+
+    <div class="right">
+      <!-- Managing files lives on ASSETS now — this whole column is the CHUNK.
+           Josh, 2026-09-11: "get the assets stuff that's currently on the input screen
+           out of there. Dedicate that whole right side" to the chunk.
+           The file INPUTS stay (hidden, zero-footprint): the ASSETS drop zones click
+           them by id, so deleting them would break adding a file from ASSETS. -->
+      <input type="file" id="filev" accept="video/*" multiple hidden>
+      <input type="file" id="filea" accept="audio/*" multiple hidden>
+
+      <!-- ===== THE CHUNK — now the whole right column ===== -->
+      <!-- THE SIDE CHUNK TRAY IS GONE (Josh, 2026-09-11: "I want to get rid of the side
+           chunk tray... let the whole bottom part be completely for audio and visual
+           controls... and then I think we can get rid of everything else").
+           These few elements survive HIDDEN because live code still reads them: `v` is
+           the input engine's video, `cprog`/`chunkwhere`/`chunkaction` are written by
+           paint(), and `lens` holds the length presets. Removing them means auditing
+           every reference, not just deleting markup. -->
+      <div class="chunkpanel" hidden>
+        <video id="v" preload="auto"></video>
+        <div class="cbar"><i id="cprog"></i></div>
+        <span id="chunkwhere">—</span>
+        <div class="lens" id="lens"></div>
+        <button class="btn pri" id="chunkaction">Mark real-time</button>
+        <div class="dabed" id="dabed" hidden>
+          <div class="dabedhead">
+            <b>AUDIO</b>
+            <span class="hint" id="da-pos">0:00 / 0:00</span>
+            <span class="sp" style="flex:1"></span>
+            <button class="btn sm" id="da-play">▶</button>
+          </div>
+          <div class="dabar" id="da-bar">
+            <div class="damarks" id="da-marks"></div>
+            <div class="dahead" id="da-head"></div>
+          </div>
+          <!-- same steps as the phone's audio row, so the muscle memory carries over -->
+          <div class="daskip">
+            <button data-da="-15">−15</button><button data-da="-5">−5</button>
+            <button data-da="-1">−1</button><button data-da="-0.5">−.5</button>
+            <button data-da="0.5">+.5</button><button data-da="1">+1</button>
+            <button data-da="5">+5</button><button data-da="15">+15</button>
+          </div>
+          <div class="dahint">the moment you mark lands <b id="da-lands">here</b></div>
+        </div>
+        <!-- SPEED mode only: the plan, in plain numbers -->
+        <div class="plan" id="planbox" hidden>
+          <div class="planrow"><span>real-time windows</span><b id="pl-real">—</b></div>
+          <div class="planrow"><span>everything else runs at</span><b id="pl-speed">—</b></div>
+          <div class="planrow"><span>lands on</span><b id="pl-total">—</b></div>
+          <div class="planwhy" id="pl-why" hidden></div>
+        </div>
+        <div class="hintrow" id="chunkhints">
+          <span class="hgroup"><kbd>P</kbd><em>play / stop the chunk</em></span>
+          <span class="hgroup"><kbd>G</kbd><em>add it to the output</em></span>
+        </div>
+      </div>
+    </div>
+  
+  </div>
+
+  <!-- ================= ASSETS SCREEN =================
+       Josh, 2026-09-10: "the input videos and that handling should be its own screen
+       similar to mobile... where the actual assets can be played individually and
+       scrolled through and analyzed." Also: reorder, and remove-with-a-warning. -->
+  <div class="assetscreen" id="screen-assets" hidden>
+    <div class="asstop">
+      <b>INPUT VIDEOS</b>
+      <span class="hint" id="ass-total">—</span>
+      <span class="sp" style="flex:1"></span>
+      <span class="hint">they play in order, left to right · drag a card to move it · drop a file on a card to insert it there · ＋ adds after</span>
+    </div>
+    <div class="asslist assgrid" id="ass-videos"></div>
+    <!-- Add sits right under the list it adds to. Josh, 2026-09-11: "I just removed the
+         first video and now I'd like to add a video back on the desktop mode. I don't
+         see an opportunity to do that." Both drops used to be stacked at the BOTTOM of
+         this screen, 567px below the fold behind a 15-line transcript — so the screen
+         where you DELETE a video had no visible way to add one back. -->
+    <div class="drop assdrop" id="dropv2">+ add a video — drop it here, or click to choose</div>
+    <div class="asstop"><b>AUDIO BED</b><span class="hint" id="ass-atotal">—</span></div>
+    <div class="asslist" id="ass-audio"></div>
+    <div class="drop assdrop" id="dropa2">+ add audio — drop it here, or click to choose</div>
+
+    <div class="asstop">
+      <b>TRANSCRIPT</b>
+      <span class="hint" id="tr-state">—</span>
+      <span class="sp" style="flex:1"></span>
+      <label class="loopwrap"><input type="checkbox" id="tr-preview" checked> show on the output</label>
+      <label class="loopwrap"><input type="checkbox" id="tr-burn"> burn into the export</label>
+      <button class="btn sm" id="tr-run">Transcribe the audio</button>
+      <button class="btn sm" id="tr-clear">Clear</button>
+    </div>
+    <div class="trlist" id="tr-list"></div>
+  </div>
+
+  <!-- ================= OUTPUT SCREEN ================= -->
+  <div class="outscreen" id="screen-output" hidden>
+    <div class="outtop">
+      <span class="outtag grab" id="outmode">GRAB output</span>
+      <button class="btn pri" id="outplay">▶ Play output &nbsp;<span style="opacity:.7">space</span></button>
+      <button class="btn sm" id="outstop" hidden>■ Stop</button>
+      <span class="clock" style="min-width:auto"><span id="tlcur">0:00.00</span> / <span id="tltot">0:00</span></span>
+      <span class="hint" id="outinfo">nothing added yet</span>
+      <span class="sp" style="flex:1"></span>
+      <span class="hint" id="outhint">esc to go back</span>
+    </div>
+    <button class="btn sm theaterclose" id="outclose">✕ &nbsp;esc</button>
+    <!-- Captions ride ON the output preview, not only in the export. Josh, 2026-09-11:
+         "I actually want to see it in the output as well so I can tweak it there.
+         I can't just have it in the export." Positioned against the video's REAL
+         rendered rect (it letterboxes inside this box), styled to match the burn-in. -->
+    <div class="outvid" id="outvid">
+      <video id="ov" preload="auto"></video>
+      <div class="subov" id="subov" hidden><span id="subovtext"></span></div>
+    </div>
+    <div class="outscrubwrap">
+      <div class="scrub outscrub" id="oscrub">
+        <div class="osegs" id="osegs"></div>
+        <div class="ohead" id="ohead"></div>
+      </div>
+      <div class="oscrubhint">click anywhere to play from there</div>
+    </div>
+    
+  </div>
+</div>
+<!-- ================= EXPORT SCREEN =================
+     Josh, 2026-09-15: "when I go to export, it should provide me a screen of like what I
+     want to export in the assumption everything in the order it's in ... allow me to
+     choose a name, allow me to choose what I want to export ... But keep it simple,
+     don't make it weird."
+     So: it shows what IS about to be exported (this chapter, in order), lets him name the
+     file, and exports. Nothing else. -->
+<div class="drawer" id="exdrawer" hidden>
+  <div class="panel">
+    <h4>Export</h4>
+    <label class="exlab">What goes in the film</label>
+    <div class="expick" id="expick"></div>
+    <div class="exsum" id="exsum"></div>
+    <label class="exlab" for="exname">File name</label>
+    <div class="exrow">
+      <input class="exinput" id="exname" type="text" spellcheck="false"
+             placeholder="Magpie" autocomplete="off">
+      <span class="exext">.mp4</span>
+    </div>
+    <div class="exhint" id="exhint">Saves to your Downloads.</div>
+    <div class="exbtns">
+      <button class="btn ok" id="exgo">Export</button>
+      <button class="btn sm" id="excancel">Cancel &nbsp;esc</button>
+    </div>
+  </div>
+</div>
+<!-- project / exports drawers, opened from the upper left -->
+<div class="drawer" id="drawer" hidden>
+  <div class="panel">
+    <h4 id="drawertitle">Projects</h4>
+    <div id="drawerbody"></div>
+    <button class="btn sm" id="drawerclose" style="margin-top:12px">Close &nbsp;esc</button>
+  </div>
+</div>
+<!-- ================= MOBILE (speed mode only) =================
+     Josh, 2026-09-09: one screen. Video track + audio track, scrub with a thumb,
+     pick a length, one button that does what G does. No grab mode on a phone.
+     Writes the SAME ramps[] the desktop reads — there is no mobile format. -->
+<div class="m" id="mobile" hidden>
+  <div class="mtop">
+    <span class="mbrand">Magpie</span>
+    <span class="mplan" id="m-plan">—</span>
+  </div>
+
+  <div class="mstage">
+    <video id="mv" playsinline preload="auto"></video>
+    <div class="mnone" id="m-none">add a video and an audio bed on a computer first</div>
+    <div class="mlive" id="m-live" hidden>PREVIEW</div>
+  </div>
+
+  <!-- ============ INPUT screen: line it up, mark it, tweak it ============ -->
+  <div id="m-screen-in">
+
+  <!-- VIDEO track + its OWN controls, directly underneath (his layout) -->
+  <div class="mtrack" id="m-vtrack">
+    <div class="mlab"><b>VIDEO</b><span id="m-vpos">0:00</span></div>
+    <div class="mbar" id="m-vbar">
+      <div class="mmarks" id="m-vmarks"></div>
+      <div class="mhead" id="m-vhead"></div>
+      <div class="mwin" id="m-vwin"></div>
+    </div>
+    <div class="mskip" data-for="video">
+      <button class="mbtn sk" data-skip="-15">−15</button>
+      <button class="mbtn sk" data-skip="-5">−5</button>
+      <button class="mbtn sk" data-skip="-1">−1</button>
+      <button class="mbtn sk" data-skip="-0.5">−.5</button>
+      <button class="mbtn sk" data-skip="0.5">+.5</button>
+      <button class="mbtn sk" data-skip="1">+1</button>
+      <button class="mbtn sk" data-skip="5">+5</button>
+      <button class="mbtn sk" data-skip="15">+15</button>
+    </div>
+  </div>
+
+  <!-- AUDIO track + its OWN independent controls -->
+  <div class="mtrack" id="m-atrack">
+    <div class="mlab"><b>AUDIO</b><span id="m-apos">0:00</span></div>
+    <div class="mbar audio" id="m-abar">
+      <div class="mmarks" id="m-amarks"></div>
+      <div class="mhead" id="m-ahead"></div>
+    </div>
+    <div class="mskip" data-for="audio">
+      <button class="mbtn sk" data-askip="-15">−15</button>
+      <button class="mbtn sk" data-askip="-5">−5</button>
+      <button class="mbtn sk" data-askip="-1">−1</button>
+      <button class="mbtn sk" data-askip="-0.5">−.5</button>
+      <button class="mbtn sk" data-askip="0.5">+.5</button>
+      <button class="mbtn sk" data-askip="1">+1</button>
+      <button class="mbtn sk" data-askip="5">+5</button>
+      <button class="mbtn sk" data-askip="15">+15</button>
+    </div>
+  </div>
+
+  <div class="mrow">
+    <button class="mbtn pri" id="m-loop">❚❚ Pause loop</button>
+    <button class="mbtn" id="m-loopaud">♪ Audio OFF</button>
+  </div>
+
+  <div class="mlens" id="m-lens"></div>
+  <div class="mslider">
+    <label class="mlenlab" for="m-lenfield">or type it</label>
+    <input type="number" id="m-lenfield" inputmode="decimal" step="0.1" min="0.1" max="120" value="2">
+    <span class="mlenval" id="m-lenval">2.0s</span>
+  </div>
+
+  <button class="mgo" id="m-mark">Make this <b id="m-golen">2s</b> real-time</button>
+
+  <div class="medit" id="m-edit" hidden>
+    <div class="meh">Editing your <b id="m-elen">2s</b> moment at <b id="m-eat">0:00</b></div>
+    <div class="mrow">
+      <button class="mbtn" id="m-e-back">◀ start</button>
+      <button class="mbtn" id="m-e-fwd">start ▶</button>
+    </div>
+    <div class="mrow">
+      <button class="mbtn" id="m-e-short">− shorter</button>
+      <button class="mbtn" id="m-e-long">+ longer</button>
+    </div>
+    <div class="mrow">
+      <button class="mbtn del" id="m-e-del">Remove it</button>
+      <button class="mbtn pri" id="m-e-done">Done</button>
+    </div>
+  </div>
+
+  <div class="mlist" id="m-list"></div>
+  </div><!-- /INPUT -->
+
+  <!-- ============ OUTPUT screen: the whole thing, jump anywhere ============
+       His: "I think I should have an output mode where I can quickly move to a
+       part of the video that I want to see... but then see the whole video at
+       once as well." -->
+  <div id="m-screen-out" hidden>
+    <div class="mrow">
+      <button class="mbtn pri" id="m-o-play">▶ Play output</button>
+      <button class="mbtn" id="m-o-stop">■ Stop</button>
+    </div>
+    <div class="mtrack">
+      <div class="mlab"><b>OUTPUT</b><span id="m-opos">0:00</span></div>
+      <div class="mbar" id="m-obar">
+        <div class="mmarks" id="m-omarks"></div>
+        <div class="mhead" id="m-ohead"></div>
+      </div>
+    </div>
+    <div class="mseglist" id="m-seglist"></div>
+  </div>
+
+  <!-- ============ FILES: the raw assets, played plainly ============
+       His: "a third tab at the bottom, one where I could just see the files that
+       we're actually working with, like where I could just view the whole video or
+       listen to the audio on its own." No chunks, no loop — just the files. -->
+  <div id="m-screen-files" hidden>
+    <div class="mfhead">Your video</div>
+    <div class="mflist" id="m-fvideos"></div>
+    <div class="mfhead">Your audio</div>
+    <div class="mflist" id="m-faudios"></div>
+  </div>
+
+  <nav class="mnav">
+    <button class="on" id="m-nav-in"><i>✂︎</i>INPUT</button>
+    <button id="m-nav-out"><i>▦</i>OUTPUT</button>
+    <button id="m-nav-files"><i>▤</i>FILES</button>
+  </nav>
+</div>
+<!-- ============ DESKTOP MOMENT EDITOR (modal) ============
+     Josh, 2026-09-10: "when I'm in the output mode screen and I click on one of the
+     existing ones, I have the ability right in there, like a modal pops up that I can
+     edit it, and I can see the preview of where I'm editing it to... move the audio,
+     move the video, adjust its length... but in a condensed version also on desktop." -->
+<!-- ===== TRIM A CLIP =====
+     Josh, 2026-09-11: "allow a button, because like we have the drag to reorder...
+     If we could also just have like an edit section where I click on edit and then it
+     pulls up a modal that like allows me to like trim the video and play the video more
+     sensibly than just like I'm just I don't even know how start here and end here are
+     supposed to work, but it's not intuitive and it kind of sucks."
+     He's right — those buttons silently read a player position you couldn't see. Here
+     the kept range IS the thing on screen: drag either handle, watch it, done. -->
+<div class="dmodal" id="tmodal" hidden>
+  <div class="dpanel">
+    <div class="dhead">
+      <span class="outtag grab">EDIT THIS CLIP</span>
+      <span class="dwhy" id="t-name">—</span>
+      <span style="flex:1"></span>
+      <button class="btn sm" id="t-close">Done &nbsp;esc</button>
+    </div>
+    <div class="dbody">
+      <div class="dpreview">
+        <video id="tv" preload="auto" muted></video>
+        <div class="dpcap" id="t-cap">drag the handles — only the lit part is used</div>
+      </div>
+      <div class="dfields">
+        <div class="dfield">
+          <label>WHAT GETS USED — drag either end</label>
+          <div class="trimbar" id="t-bar">
+            <div class="trimkeep" id="t-keep"></div>
+            <div class="trimhandle in" id="t-in"></div>
+            <div class="trimhandle out" id="t-out"></div>
+            <div class="trimhead" id="t-head"></div>
+          </div>
+          <div class="trimscale"><span id="t-zero">0:00</span><span id="t-full">—</span></div>
+        </div>
+        <div class="dfield">
+          <label>PLAY IT</label>
+          <div class="drow">
+            <button id="t-play" class="wide">▶ Play what's kept</button>
+            <button id="t-toin">⇤ jump to start</button>
+            <button id="t-toout">jump to end ⇥</button>
+          </div>
+          <div class="trimnow"><span id="t-now">0:00</span></div>
+        </div>
+        <div class="dfield">
+          <label>BREAK IT IN TWO</label>
+          <div class="drow">
+            <button id="t-split" class="wide">✂ Split here</button>
+          </div>
+          <div class="dhint" id="t-splithint">Cuts this clip into two at the playhead.
+            Nothing is re-encoded and the file is untouched — you get two clips you can
+            trim, reorder or switch off on their own.</div>
+        </div>
+        <div class="dfield">
+          <label>THE EXACT POINTS</label>
+          <div class="drow">
+            <span class="trimlab">start</span>
+            <input type="number" id="t-instart" step="0.1" min="0">
+            <span class="trimlab">end</span>
+            <input type="number" id="t-outend" step="0.1" min="0">
+          </div>
+          <div class="trimsum" id="t-sum">—</div>
+        </div>
+        <div class="dfield">
+          <div class="drow">
+            <button id="t-all" class="wide">Use all of it</button>
+            <button id="t-setin" class="wide">Start where it's playing</button>
+            <button id="t-setout" class="wide">End where it's playing</button>
+          </div>
+          <div class="trimwarn" id="t-warn" hidden></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="dmodal" id="dmodal" hidden>
+  <div class="dpanel">
+    <div class="dhead">
+      <span class="outtag speed" id="d-tag">REAL-TIME MOMENT</span>
+      <span class="dwhy" id="d-why">—</span>
+      <span style="flex:1"></span>
+      <button class="btn sm" id="d-close">Done &nbsp;esc</button>
+    </div>
+    <div class="dbody">
+      <div class="dpreview">
+        <video id="dv" preload="auto" muted></video>
+        <div class="dpcap" id="d-cap">the frame this moment starts on</div>
+      </div>
+      <div class="dfields">
+        <div class="dfield vid">
+          <label for="d-video"><i class="sym">🎞</i>VIDEO · STARTS AT</label>
+          <div class="drow">
+            <button data-dv="-5">−5</button><button data-dv="-1">−1</button>
+            <button data-dv="-0.5">−.5</button>
+            <input type="number" id="d-video" step="0.1" min="0">
+            <button data-dv="0.5">+.5</button><button data-dv="1">+1</button>
+            <button data-dv="5">+5</button>
+          </div>
+        </div>
+        <div class="dfield aud" id="d-audfield">
+          <label for="d-audio"><i class="sym">🎙</i>AUDIO · LANDS AT</label>
+          <div class="drow">
+            <button data-dn="-5">−5</button><button data-dn="-1">−1</button>
+            <button data-dn="-0.5">−.5</button>
+            <input type="number" id="d-audio" step="0.1" min="0">
+            <button data-dn="0.5">+.5</button><button data-dn="1">+1</button>
+            <button data-dn="5">+5</button>
+          </div>
+        </div>
+        <div class="dfield len">
+          <label for="d-len"><i class="sym">⏱</i>LENGTH</label>
+          <div class="drow">
+            <button data-dl="-1">−1</button><button data-dl="-0.5">−.5</button>
+            <input type="number" id="d-len" step="0.1" min="0.1">
+            <button data-dl="0.5">+.5</button><button data-dl="1">+1</button>
+          </div>
+        </div>
+        <!-- RATE — how fast this chunk's footage plays (1 = real time). Same footage,
+             so a faster rate takes less of the audio. Josh, 2026-09-24. -->
+        <div class="dfield rate">
+          <label for="d-rate"><i class="sym">⏩</i>RATE <span class="dhint" id="d-ratehint">real time</span></label>
+          <div class="drow">
+            <button data-dr="0.25">¼×</button><button data-dr="0.5">½×</button>
+            <input type="number" id="d-rate" step="0.05" min="0.05" max="20">
+            <button data-dr="1">1×</button><button data-dr="2">2×</button><button data-dr="4">4×</button>
+          </div>
+        </div>
+        <div class="dplan" id="d-plan"></div>
+        <div class="dloop">
+          <button class="btn sm" id="d-loop">▶ Loop this</button>
+          <label class="loopwrap"><input type="checkbox" id="d-loopaud" checked> ♪ with the audio</label>
+          <span class="sp" style="flex:1"></span>
+          <span class="hint" id="d-aud">—</span>
+        </div>
+        <div class="dfoot">
+          <button class="btn pri" id="d-save">Save</button>
+          <button class="btn" id="d-del" style="background:#2a1a1a;border-color:#5c2f2f;color:#e59d9d">Remove this moment</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- 🔇 SILENCE editor — click a hatched silence on the AUDIO track (Josh, 2026-09-26:
+     "click on it like I can the other bits and then edit where it's at how long it is") -->
+<div class="dmodal" id="smodal" hidden>
+  <div class="dpanel" style="width:min(560px,96vw)">
+    <div class="dhead">
+      <span class="outtag" style="background:#2c313c;color:var(--ink)">SILENCE</span>
+      <span class="dwhy" id="s-why">—</span>
+      <span style="flex:1"></span>
+      <button class="btn sm" id="s-close">Done &nbsp;esc</button>
+    </div>
+    <div class="dfields" style="padding:15px">
+      <div class="dfield aud">
+        <label for="s-at">STARTS AT (seconds in the audio)</label>
+        <div class="drow">
+          <button data-sa="-5">−5</button><button data-sa="-1">−1</button>
+          <button data-sa="-0.5">−.5</button>
+          <input type="number" id="s-at" step="0.1" min="0">
+          <button data-sa="0.5">+.5</button><button data-sa="1">+1</button>
+          <button data-sa="5">+5</button>
+        </div>
+      </div>
+      <div class="dfield len">
+        <label for="s-len">LENGTH (seconds)</label>
+        <div class="drow">
+          <button data-sl="-1">−1</button><button data-sl="-0.5">−.5</button>
+          <input type="number" id="s-len" step="0.1" min="0.05">
+          <button data-sl="0.5">+.5</button><button data-sl="1">+1</button>
+        </div>
+      </div>
+      <div class="dplan" id="s-plan"></div>
+      <div class="dloop">
+        <button class="btn sm" id="s-hear">▶ Hear it</button>
+        <span class="hint">plays from a second before to a second after · space</span>
+      </div>
+      <div class="dfoot">
+        <button class="btn pri" id="s-done">Save</button>
+        <button class="btn" id="s-del" style="background:#2a1a1a;border-color:#5c2f2f;color:#e59d9d">Remove this silence</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+<script src="/app.js"></script>
+</body>
+</html>
