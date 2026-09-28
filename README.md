@@ -38,7 +38,7 @@ This is the part that matters most. **Magpie is not meant to be used as-is.**
 Magpie is the screen where *you* make the decisions: which moment, where it lands, how long it
 plays. Everything else is meant to be added by you and [Claude Code](https://claude.com/claude-code)
 the moment you need it. Every feature in here got built that way, mid-project, the minute it was
-needed: splitting a clip, chapters, captions, trimming the dead air out of a recording.
+needed: splitting a clip, chapters, captions, switching a clip off.
 
 So when Magpie doesn't do something you need:
 
