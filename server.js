@@ -196,7 +196,9 @@ const cleanRate = v => { const r = Number(v); return (isFinite(r) && r > 0) ? +M
 function loadState() {
   let st;
   try { st = { ...EMPTY, ...JSON.parse(fs.readFileSync(STATE_FILE, 'utf8')) }; }
-  catch { return { ...EMPTY }; }
+  /* First run (no project yet) must still get an active chapter, or export has nothing
+     to act on and fails with "no chapters selected". Found testing a fresh install. */
+  catch { return ensureChapters({ ...EMPTY }); }
   // ramps predating the audioAt anchor: place them in order rather than orphaning them
   let acc = 0;
   for (const r of (st.ramps || [])) {
