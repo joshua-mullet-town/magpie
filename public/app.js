@@ -2317,7 +2317,7 @@ async function onSourcesPush(d) {
   await refresh();
   if (!$('screen-assets').hidden) renderAssets();
   if (d && d.added && !had.has(d.added)) {
-    toast(`📥 ${d.name} is in — processing (original kept in Movies › Magpie Inbox › Imported)`);
+    toast(`📥 ${d.name} is in — processing` + (d.kept ? ` (original kept in ${d.kept})` : ''));
     setTimeout(() => { const i = S.sources.findIndex(x => x.id === d.added);
       const el = i < 0 ? null : document.querySelector(`#screen-assets .asscard[data-idx="${i}"]`);
       if (el) { el.scrollIntoView({ block: 'center', behavior: 'smooth' });

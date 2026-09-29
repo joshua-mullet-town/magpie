@@ -352,8 +352,11 @@ function pushEvent(type, data) {
 setInterval(() => { for (const r of sseClients) { try { r.write(': keepalive\n\n'); } catch { sseClients.delete(r); } } }, 25000);
 
 /* A video file already sitting in SOURCES as `srcFile` → a clip in the open chapter, with
-   its proxy started immediately. Shared by the upload button and the Inbox watcher. */
-async function addSourceFile(id, srcFile, name, bytes, at) {
+   its proxy started immediately. Shared by the upload button and the Inbox watcher.
+   `kept` is where the ORIGINAL now lives — set only by the Inbox, which moves it. An upload
+   passes nothing, so the page doesn't claim an original was kept in an inbox that the
+   upload never touched (it did, for every upload, until 2026-09-28). */
+async function addSourceFile(id, srcFile, name, bytes, at, kept) {
   const info = await probe(path.join(SOURCES, srcFile));
   if (!info.hasVideo) {
     await fsp.unlink(path.join(SOURCES, srcFile)).catch(() => {});
@@ -366,7 +369,7 @@ async function addSourceFile(id, srcFile, name, bytes, at) {
   if (Number.isInteger(at) && at >= 0 && at < STATE.sources.length) STATE.sources.splice(at, 0, entry);
   else STATE.sources.push(entry);
   saveState(STATE);
-  pushEvent('sources', { added: id, name });
+  pushEvent('sources', { added: id, name, kept: kept || null });
   makeProxy(id, path.join(SOURCES, srcFile), path.join(PROXIES, proxyFile), info.duration)
     .then(async (ok) => {
       const e = STATE.sources.find(x => x.id === id);
@@ -418,7 +421,8 @@ async function inboxTick() {
       let dest = path.join(INBOX_DONE, f);
       if (fs.existsSync(dest)) dest = path.join(INBOX_DONE, `${path.parse(f).name} (${id})${path.extname(f)}`);
       await fsp.rename(full, dest);
-      const r = await addSourceFile(id, srcFile, safe(f), st.size, NaN);
+      const r = await addSourceFile(id, srcFile, safe(f), st.size, NaN,
+                                    dest.replace(require('os').homedir(), '~'));
       console.log(`[inbox] ${f} -> ${r.error ? 'REJECTED: ' + r.error : 'clip ' + id + ' in "' + (STATE.chapterTitle || '?') + '"'}`);
     }
   } catch (e) { if (e.code !== 'ENOENT') console.error('[inbox]', e.message); }
