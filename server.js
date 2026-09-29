@@ -90,6 +90,12 @@ const EMPTY = {
     loopAudio: false,  // does the bed play along with the loop
   },
 };
+/* A FRESH COPY of EMPTY, never EMPTY itself. `{ ...EMPTY }` is a SHALLOW copy: the new
+   state's `sources`, `audio`, `ramps`… arrays ARE EMPTY's arrays, so the first clip added
+   after a Start over was pushed into EMPTY — and every later Start over handed the same
+   filled arrays straight back. Start over never cleared anything (found 2026-09-28: on a
+   fresh install, add a clip, Start over, the clip is still there). Always build from this. */
+const freshEmpty = () => JSON.parse(JSON.stringify(EMPTY));
 const projFile = (name) => path.join(PROJECTS, safeName(name) + '.json');
 const safeName = (n) => (String(n || 'Untitled').trim().replace(/[^\w .\-]+/g, '_').slice(0, 60)) || 'Untitled';
 
@@ -195,10 +201,10 @@ function outLen(x) { return (+(x && x.len) || 0) / rateOf(x); }
 const cleanRate = v => { const r = Number(v); return (isFinite(r) && r > 0) ? +Math.max(0.05, Math.min(20, r)).toFixed(3) : null; };
 function loadState() {
   let st;
-  try { st = { ...EMPTY, ...JSON.parse(fs.readFileSync(STATE_FILE, 'utf8')) }; }
+  try { st = { ...freshEmpty(), ...JSON.parse(fs.readFileSync(STATE_FILE, 'utf8')) }; }
   /* First run (no project yet) must still get an active chapter, or export has nothing
      to act on and fails with "no chapters selected". Found testing a fresh install. */
-  catch { return ensureChapters({ ...EMPTY }); }
+  catch { return ensureChapters(freshEmpty()); }
   // ramps predating the audioAt anchor: place them in order rather than orphaning them
   let acc = 0;
   for (const r of (st.ramps || [])) {
@@ -514,6 +520,7 @@ const WHISPER = process.env.MAGPIE_WHISPER_URL || 'http://localhost:8178/inferen
 const FIXUPS = [
   [/\bcl(?:ou|au)d\s+code\b/gi, 'Claude Code'],
   [/\bclod\s+code\b/gi, 'Claude Code'],
+  [/\bclawed\s+code\b/gi, 'Claude Code'],   // heard 2026-09-28 on a clean TTS voiceover
   [/\bchat\s*g[bp]t\b/gi, 'ChatGPT'],
   [/\bco[- ]?pilot\b/gi, 'Copilot'],
   [/\bcursor\b/g, 'Cursor'],
@@ -2131,7 +2138,7 @@ const server = http.createServer(async (req, res) => {
       catch { return sendJSON(res, { error: 'no project by that name' }, 404); }
       // ensureChapters: a project saved before chapters existed still opens into a valid
       // one-chapter document rather than one with no active chapter at all.
-      STATE = ensureChapters({ ...EMPTY, ...j, name: safeName(b.name) });
+      STATE = ensureChapters({ ...freshEmpty(), ...j, name: safeName(b.name) });
       saveState(STATE);
       return sendJSON(res, { ok: true, state: STATE });
     }
@@ -2157,7 +2164,7 @@ const server = http.createServer(async (req, res) => {
          chapterId null — no chapter active at all, so the strip would be empty and
          every chapter call would have nothing to act on until a reload re-ran the
          migration. Give it a real chapter here instead. */
-      STATE = { ...EMPTY, chapters: [],
+      STATE = { ...freshEmpty(), chapters: [],
                 chapterId: crypto.randomBytes(6).toString('hex'),
                 chapterTitle: 'Intro', chapterOrd: 0 };
       saveState(STATE);
