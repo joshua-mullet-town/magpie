@@ -15,6 +15,11 @@ it, and you don't want to spend a weekend learning a real video editor to get th
 Honestly? Can't blame you. I didn't want to either. So I built this instead, and made
 [the whole Homestead film](https://mullet.town/homestead/video) with it.
 
+<p align="center">
+  <a href="https://mullet.town/magpie#tutorial"><img src="docs/tutorial.jpg" alt="Play the two-minute Magpie tutorial" width="720"></a><br>
+  <b><a href="https://mullet.town/magpie#tutorial">▶ Watch the 2-minute tutorial</a></b>, made in Magpie.
+</p>
+
 ## How it works
 
 1. 🎙️ **Drop in your audio.** Your narration. That's the length of your film.
