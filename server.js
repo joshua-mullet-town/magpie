@@ -1252,7 +1252,16 @@ async function renderChapters(ids, onProgress) {
            have come from any of them. */
         throw new Error(`“${title}”: ${e.message}`);
       }
-      parts.push(path.join(OUT, made));
+      /* 🚨 EVERY PART MUST CARRY THE SAME AUDIO FORMAT BEFORE THE CONCAT. Chapters' beds
+         differ (a mono mic take vs a stereo one), and the concat demuxer does not cope with
+         the layout changing between parts: a mono Outro joined after four stereo chapters
+         came out as a rhythmic crackle across its whole length, while the chapter rendered
+         alone was clean (Josh, 2026-09-29: "a rhythmic like noise going the whole time").
+         Re-encode each part's audio to one layout (video stream-copied, no quality cost). */
+      const even = path.join(work, `part-${i}.mp4`);
+      await run('ffmpeg', ['-v', 'error', '-y', '-i', path.join(OUT, made),
+        '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k', '-ac', '2', '-ar', '48000', even]);
+      parts.push(even);
     }
 
     /* Stitch. The per-chapter films already share a codec, pixel format and frame rate
